@@ -1,0 +1,290 @@
+// ============================================================================
+// Quran Hifz Companion — Database Schema
+//
+// This schema is intentionally split into two zones:
+//
+//   1. QURAN REFERENCE DATA (Surah, Ayah, MutashabihatMatch)
+//      - Immutable. Imported from a trusted dataset (see /scripts/import-quran).
+//      - Never edited by normal users through the app.
+//      - `Ayah.textUthmani` is the ONLY field ever shown to the user as
+//        "the Quran text." `Ayah.textSearchNormalized` exists purely for the
+//        Mutashabihat search index and is NEVER rendered.
+//
+//   2. USER DATA (User, AyahStatus, RevisionSession, RevisionEntry, Mistake,
+//      MutashabihatCollection, MutashabihatCollectionItem, Note)
+//      - Fully personal, editable, deletable by the owning user.
+//      - Never influences or overwrites Quran reference data.
+//
+// Dataset provenance is recorded in QuranDataset so the app can always answer
+// "where did this text come from" — see section 23 (Data Integrity).
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for local development; point DATABASE_URL at Postgres in production.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Dataset provenance (Data Integrity — section 23)
+// ---------------------------------------------------------------------------
+
+model QuranDataset {
+  id          String   @id @default(cuid())
+  name        String // e.g. "quran-json (Uthmani, Noble Quran Encyclopedia)"
+  sourceUrl   String
+  license     String
+  version     String
+  importedAt  DateTime @default(now())
+  checksum    String // hash of the raw import payload, for integrity checks
+  isActive    Boolean  @default(true)
+  surahs      Surah[]
+}
+
+// ---------------------------------------------------------------------------
+// Quran reference data — IMMUTABLE
+// ---------------------------------------------------------------------------
+
+model Surah {
+  id                Int      @id // 1-114, matches the Mushaf surah number
+  nameArabic        String
+  nameTransliterated String
+  nameTranslated    String?
+  revelationType    String // "meccan" | "medinan"
+  totalAyahs        Int
+  dataset           QuranDataset @relation(fields: [datasetId], references: [id])
+  datasetId         String
+  ayahs             Ayah[]
+
+  @@index([datasetId])
+}
+
+model Ayah {
+  id     String @id @default(cuid())
+  surah  Surah  @relation(fields: [surahId], references: [id])
+  surahId Int
+  numberInSurah Int   // Ayah number within its surah (1-based)
+  globalAyahNumber Int @unique // 1-6236 position across the whole Quran
+
+  // --- Sacred text: displayed to users, NEVER modified by the app ---
+  textUthmani String
+
+  // --- Search-only derived field: NEVER rendered, only used for indexing ---
+  textSearchNormalized String
+
+  // --- Navigation / mushaf metadata (from quran-meta, Hafs/Madani mushaf) ---
+  juz          Int
+  hizb         Int
+  rubAlHizb    Int?
+  page         Int?
+  isSajdah     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  ayahStatuses      AyahStatus[]
+  revisionEntries   RevisionEntry[]
+  mistakes          Mistake[]
+  notes             Note[]
+  collectionItemsA  MutashabihatCollectionItem[] @relation("collectionItemAyahA")
+  collectionItemsB  MutashabihatCollectionItem[] @relation("collectionItemAyahB")
+  matchesAsSource   MutashabihatMatch[] @relation("matchSource")
+  matchesAsTarget   MutashabihatMatch[] @relation("matchTarget")
+  translations      AyahTranslation[]
+
+  @@unique([surahId, numberInSurah])
+  @@index([juz])
+  @@index([page])
+}
+
+// Precomputed Mutashabihat index (section 21/22, extended for phrase-level
+// context-aware matching).
+// Built offline by /scripts/build-mutashabihat-index, read-only at request time.
+model MutashabihatMatch {
+  id           String   @id @default(cuid())
+  sourceAyah   Ayah     @relation("matchSource", fields: [sourceAyahId], references: [id])
+  sourceAyahId String
+  targetAyah   Ayah     @relation("matchTarget", fields: [targetAyahId], references: [id])
+  targetAyahId String
+
+  // One of: EXACT_FULL_AYAH | EXACT_PHRASE | NEAR_EXACT_PHRASE |
+  // SIMILAR_BEGINNING | SIMILAR_ENDING | SIMILAR_MIDDLE_PHRASE |
+  // SIMILAR_STRUCTURE | CONTEXTUAL (see src/types/quran.ts:MatchCategory).
+  // Stored as a plain string rather than a Prisma enum so this schema works
+  // unchanged on both SQLite (dev) and Postgres (prod) — SQLite has no
+  // native enum type.
+  category     String
+  similarity   Float // 0.0 - 1.0, average coverage of the matched phrase over both ayahs
+  method       String // e.g. "longest-common-phrase(ngram-candidates n=3,4)"
+  reason       String // human-readable explanation shown in the UI
+
+  // Token-index span of the matched phrase, 0-based inclusive, into each
+  // ayah's whitespace-tokenized ORIGINAL text (verified 1:1 aligned with the
+  // normalized/search tokenization used to find it — see
+  // src/utils/phraseMatch.ts). Used only to highlight the matched words in
+  // the real Uthmani text; the normalized text itself is never rendered.
+  sourcePhraseStart Int
+  sourcePhraseEnd   Int
+  targetPhraseStart Int
+  targetPhraseEnd   Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([sourceAyahId, targetAyahId])
+  @@index([sourceAyahId, similarity])
+}
+
+// ---------------------------------------------------------------------------
+// Translation data — a SEPARATE, clearly-attributed dataset, never mixed
+// with the Arabic Quran text. Provider-based (mirrors QuranDataset) so a
+// second language/source can be added later without touching this shape.
+// ---------------------------------------------------------------------------
+
+model TranslationSource {
+  id         String   @id @default(cuid())
+  languageCode String // e.g. "en"
+  name       String // e.g. "Saheeh International"
+  sourceUrl  String
+  license    String
+  importedAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+  translations AyahTranslation[]
+}
+
+model AyahTranslation {
+  id           String @id @default(cuid())
+  ayah         Ayah   @relation(fields: [ayahId], references: [id])
+  ayahId       String
+  source       TranslationSource @relation(fields: [sourceId], references: [id])
+  sourceId     String
+  languageCode String
+  text         String // translated meaning — never Quran text, never treated as such
+
+  @@unique([ayahId, sourceId])
+  @@index([ayahId])
+}
+
+
+// ---------------------------------------------------------------------------
+// User data — fully personal
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  // Never store plaintext/reversible passwords. This holds a salted hash only
+  // (e.g. bcrypt/argon2), populated once auth (Phase 8) is wired up.
+  passwordHash String?
+  createdAt    DateTime @default(now())
+
+  ayahStatuses            AyahStatus[]
+  revisionSessions        RevisionSession[]
+  revisionEntries         RevisionEntry[]
+  mistakes                Mistake[]
+  notes                   Note[]
+  mutashabihatCollections MutashabihatCollection[]
+  streak                  RevisionStreak?
+}
+
+model AyahStatus {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  ayah      Ayah     @relation(fields: [ayahId], references: [id])
+  ayahId    String
+  // One of the HifzStatus values in src/types/quran.ts. Plain string for the
+  // same cross-database reason as MatchCategory above.
+  status    String   @default("NOT_STARTED")
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, ayahId])
+  @@index([userId, status])
+}
+
+model RevisionSession {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+  entries   RevisionEntry[]
+}
+
+model RevisionEntry {
+  id             String   @id @default(cuid())
+  session        RevisionSession @relation(fields: [sessionId], references: [id])
+  sessionId      String
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String
+  ayah           Ayah     @relation(fields: [ayahId], references: [id])
+  ayahId         String
+  revisedAt      DateTime @default(now())
+  // One of the RecallQuality values in src/types/quran.ts.
+  recallQuality  String
+  mistakeCount   Int      @default(0)
+  confidence     Int      @default(3) // 1-5 stars
+  recalledWithoutLooking Boolean @default(false)
+
+  @@index([userId, ayahId, revisedAt])
+}
+
+model Mistake {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  ayah      Ayah     @relation(fields: [ayahId], references: [id])
+  ayahId    String
+  // One of the MistakeType values in src/types/quran.ts.
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, ayahId])
+  @@index([userId, type])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  ayah      Ayah     @relation(fields: [ayahId], references: [id])
+  ayahId    String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, ayahId])
+}
+
+model MutashabihatCollection {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  items     MutashabihatCollectionItem[]
+}
+
+model MutashabihatCollectionItem {
+  id           String   @id @default(cuid())
+  collection   MutashabihatCollection @relation(fields: [collectionId], references: [id])
+  collectionId String
+  ayahA        Ayah     @relation("collectionItemAyahA", fields: [ayahAId], references: [id])
+  ayahAId      String
+  ayahB        Ayah     @relation("collectionItemAyahB", fields: [ayahBId], references: [id])
+  ayahBId      String
+  addedAt      DateTime @default(now())
+}
+
+model RevisionStreak {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String   @unique
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  lastActiveDay DateTime?
+}

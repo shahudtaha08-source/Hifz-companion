@@ -1,0 +1,42 @@
+{
+  "name": "quran-hifz-companion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Quran Hifz companion web app: memorization tracking, revision, and a Mutashabihat (similar-ayah) finder. Not a replacement for a qualified Quran teacher.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "import:quran": "tsx scripts/import-quran/index.ts",
+    "build:mutashabihat-index": "tsx scripts/build-mutashabihat-index/index.ts",
+    "setup": "npm run db:push && npm run import:quran && npm run build:mutashabihat-index"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "next": "^14.2.5",
+    "quran-json": "^3.1.2",
+    "quran-meta": "^6.0.17",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.15",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.40",
+    "prisma": "^5.19.1",
+    "tailwindcss": "^3.4.7",
+    "tsx": "^4.16.5",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

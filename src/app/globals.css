@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /*
+   * NOTE: for production, self-host a proper Mushaf-grade Uthmani font
+   * (e.g. "KFGQPC Uthmanic Script HAFS" or "Amiri Quran") under
+   * /public/fonts and reference it here. Falling back to widely-available
+   * Arabic serif fonts for Phase 1 so the app runs without extra assets.
+   */
+  --font-arabic: "Amiri Quran", "Scheherazade New", "Traditional Arabic", serif;
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-paper-light text-ink-light dark:bg-paper-dark dark:text-ink-dark;
+  font-family: var(--font-ui);
+}
+
+/* Quran Reading Mode: maximize legibility, minimize chrome (section 18). */
+.quran-reading-mode {
+  @apply bg-paper-light dark:bg-paper-dark;
+}
+.quran-reading-mode .ayah-text {
+  font-size: 1.85rem;
+  line-height: 3.1rem;
+}
+
+.ayah-text {
+  font-family: var(--font-arabic);
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+::selection {
+  background-color: theme("colors.brand.200");
+}
+.dark ::selection {
+  background-color: theme("colors.brand.800");
+}
