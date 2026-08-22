@@ -30,9 +30,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="min-h-screen flex flex-col">
           <AppHeader />
           <main className="flex-1">{children}</main>
-          <footer className="text-center text-xs text-ink-light/50 dark:text-ink-dark/50 py-6">
-            This app is a memorization and revision aid. It does not replace a qualified Quran
-            teacher (Ustadh/Ustadha) for tajweed, ijazah, or verification of memorization.
+          <footer className="text-center text-xs text-ink-light/50 dark:text-ink-dark/50 py-6 px-4">
+            <p>
+              This app is a memorization and revision aid. It does not replace a qualified Quran
+              teacher (Ustadh/Ustadha) for tajweed, ijazah, or verification of memorization.
+            </p>
+            <p className="mt-2 font-medium text-ink-light/70 dark:text-ink-dark/70">
+              Developed with care by Taha Shahud
+            </p>
           </footer>
         </div>
       </body>
