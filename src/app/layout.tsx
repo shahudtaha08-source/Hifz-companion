@@ -1,11 +1,19 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { ServiceWorkerRegistration } from "@/components/layout/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
   title: "Hifz Companion — Quran Memorization & Mutashabihat",
   description:
     "A Hifz memorization and revision companion with a Mutashabihat (similar-ayah) finder. A study aid — not a replacement for a qualified Quran teacher.",
+  applicationName: "Hifz Companion",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Hifz Companion", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2f6b4f",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        <ServiceWorkerRegistration />
         <div className="min-h-screen flex flex-col">
           <AppHeader />
           <main className="flex-1">{children}</main>
