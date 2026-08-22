@@ -6,14 +6,17 @@ export const metadata: Metadata = {
   title: "Hifz Companion — Quran Memorization & Mutashabihat",
   description:
     "A Hifz memorization and revision companion with a Mutashabihat (similar-ayah) finder. A study aid — not a replacement for a qualified Quran teacher.",
-  verification: {
-    google: "W40nEh6eH9wUnLdOAEmTtojwGSJpStDkEkAzo7S2Ea0",
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <meta
+          name="google-site-verification"
+          content="W40nEh6eH9wUnLdOAEmTtojwGSJpStDkEkAzo7S2Ea0"
+        />
+      </head>
       <body>
         <div className="min-h-screen flex flex-col">
           <AppHeader />
