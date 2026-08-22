@@ -4,45 +4,40 @@
 
 :root {
   --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
-  /*
-   * NOTE: for production, self-host a proper Mushaf-grade Uthmani font
-   * (e.g. "KFGQPC Uthmanic Script HAFS" or "Amiri Quran") under
-   * /public/fonts and reference it here. Falling back to widely-available
-   * Arabic serif fonts for Phase 1 so the app runs without extra assets.
-   */
   --font-arabic: "Amiri Quran", "Scheherazade New", "Traditional Arabic", serif;
 }
 
 html {
   color-scheme: light;
+  scroll-behavior: smooth;
 }
-html.dark {
-  color-scheme: dark;
-}
+html.dark { color-scheme: dark; }
+
+* { -webkit-tap-highlight-color: transparent; }
 
 body {
   @apply bg-paper-light text-ink-light dark:bg-paper-dark dark:text-ink-dark;
   font-family: var(--font-ui);
+  min-width: 320px;
+  overflow-x: hidden;
 }
 
-/* Quran Reading Mode: maximize legibility, minimize chrome (section 18). */
-.quran-reading-mode {
-  @apply bg-paper-light dark:bg-paper-dark;
-}
-.quran-reading-mode .ayah-text {
-  font-size: 1.85rem;
-  line-height: 3.1rem;
-}
+button, a, select, input { touch-action: manipulation; }
+
+.quran-reading-mode { @apply bg-paper-light dark:bg-paper-dark; }
+.quran-reading-mode .ayah-text { font-size: clamp(1.7rem, 4.5vw, 2.15rem); line-height: 3.1rem; }
 
 .ayah-text {
   font-family: var(--font-arabic);
   direction: rtl;
   unicode-bidi: isolate;
+  overflow-wrap: anywhere;
 }
 
-::selection {
-  background-color: theme("colors.brand.200");
-}
-.dark ::selection {
-  background-color: theme("colors.brand.800");
+::selection { background-color: theme("colors.brand.200"); }
+.dark ::selection { background-color: theme("colors.brand.800"); }
+
+@media (max-width: 640px) {
+  .ayah-text { font-size: 1.55rem; line-height: 2.75rem; }
+  .quran-reading-mode .ayah-text { font-size: 1.75rem; line-height: 3rem; }
 }
