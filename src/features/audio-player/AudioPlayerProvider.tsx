@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_RECITER_ID, DEFAULT_URDU_TRANSLATION_RECITER_ID, RECITERS, getAyahAudioUrl, getReciterById } from "@/services/quranAudioService";
+import { DEFAULT_RECITER_ID, DEFAULT_URDU_TRANSLATION_RECITER_ID, RECITERS, getAyahAudioUrls, getReciterById } from "@/services/quranAudioService";
 import { loadSavedReciterId, saveReciterId } from "@/lib/reciterPreference";
 import type { AyahRef, AudioSegmentKind, PlaybackMode, PlaybackSegment, PlaybackStatus, RepeatProgress } from "@/types/audio";
 
@@ -28,6 +28,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const reciterIdRef = useRef(DEFAULT_RECITER_ID);
   const translationReciterIdRef = useRef(DEFAULT_URDU_TRANSLATION_RECITER_ID);
   const playTokenRef = useRef(0);
+  const candidateUrlsRef = useRef<string[]>([]);
+  const candidateIndexRef = useRef(0);
   const [reciterId, setReciterIdState] = useState(DEFAULT_RECITER_ID);
   const [translationReciterId, setTranslationReciterIdState] = useState(DEFAULT_URDU_TRANSLATION_RECITER_ID);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
@@ -52,17 +54,23 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const loadAndPlaySegment = useCallback((segment: PlaybackSegment) => {
     const audio = audioRef.current; if (!audio) return;
     const myToken = ++playTokenRef.current;
-    const url = getAyahAudioUrl(segment.reciterId, segment.surahId, segment.numberInSurah);
-    if (!url) {
+    const urls = getAyahAudioUrls(segment.reciterId, segment.surahId, segment.numberInSurah);
+    if (!urls.length) {
       if (playTokenRef.current !== myToken) return;
       setPlayingKey(ayahKey(segment.surahId, segment.numberInSurah)); setCurrentSegmentKind(segment.kind);
       setStatus("error"); setErrorMessage(`Audio isn't available for ${getReciterById(segment.reciterId)?.displayName ?? "this voice"} yet.`);
       queueRef.current = null; setRepeatProgress(null); return;
     }
-    audio.pause(); audio.src = url; audio.currentTime = 0;
+    candidateUrlsRef.current = urls;
+    candidateIndexRef.current = 0;
+    audio.pause(); audio.src = urls[0]!; audio.currentTime = 0; audio.load();
     setPlayingKey(ayahKey(segment.surahId, segment.numberInSurah)); setCurrentSegmentKind(segment.kind);
     setStatus("loading"); setErrorMessage(null);
-    audio.play().catch(() => { if (playTokenRef.current === myToken) { setStatus("error"); setErrorMessage("This audio couldn't be played. Please try again."); } });
+    audio.play().catch(() => {
+      // The audio error event handles source fallback. Keep this catch quiet so
+      // a failed primary mirror does not mask a working backup source.
+      if (playTokenRef.current === myToken) setStatus("loading");
+    });
   }, []);
 
   useEffect(() => {
@@ -77,15 +85,29 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         const nextQueue = { ...queue, index: queue.index + 1 }; queueRef.current = nextQueue;
         setRepeatProgress(computeProgress(nextQueue)); loadAndPlaySegment(nextQueue.items[nextQueue.index]!); return;
       }
+      candidateUrlsRef.current = []; candidateIndexRef.current = 0;
       queueRef.current = null; setRepeatProgress(null); setPlayingKey(null); setCurrentSegmentKind(null); setStatus("idle");
     };
-    const onError = () => { setStatus("error"); setErrorMessage("This audio couldn't be loaded. Please try again."); queueRef.current = null; setRepeatProgress(null); };
+    const onError = () => {
+      const nextIndex = candidateIndexRef.current + 1;
+      const nextUrl = candidateUrlsRef.current[nextIndex];
+      if (nextUrl) {
+        candidateIndexRef.current = nextIndex;
+        setStatus("loading"); setErrorMessage(null);
+        audio.pause(); audio.src = nextUrl; audio.currentTime = 0; audio.load();
+        audio.play().catch(() => setStatus("loading"));
+        return;
+      }
+      setStatus("error"); setErrorMessage("This audio couldn't be loaded from any available source. Please try again.");
+      candidateUrlsRef.current = []; candidateIndexRef.current = 0;
+      queueRef.current = null; setRepeatProgress(null);
+    };
     audio.addEventListener("waiting", onWaiting); audio.addEventListener("canplay", onCanPlay); audio.addEventListener("playing", onPlaying); audio.addEventListener("pause", onPause); audio.addEventListener("ended", onEnded); audio.addEventListener("error", onError);
-    return () => { playTokenRef.current++; audio.pause(); audio.src = ""; audio.removeEventListener("waiting", onWaiting); audio.removeEventListener("canplay", onCanPlay); audio.removeEventListener("playing", onPlaying); audio.removeEventListener("pause", onPause); audio.removeEventListener("ended", onEnded); audio.removeEventListener("error", onError); };
+    return () => { playTokenRef.current++; audio.pause(); audio.src = ""; candidateUrlsRef.current = []; candidateIndexRef.current = 0; audio.removeEventListener("waiting", onWaiting); audio.removeEventListener("canplay", onCanPlay); audio.removeEventListener("playing", onPlaying); audio.removeEventListener("pause", onPause); audio.removeEventListener("ended", onEnded); audio.removeEventListener("error", onError); };
   }, [computeProgress, loadAndPlaySegment]);
   useEffect(() => setReciterIdState(loadSavedReciterId()), []);
 
-  const clearQueueAndStop = useCallback(() => { playTokenRef.current++; const audio = audioRef.current; if (audio) { audio.pause(); audio.currentTime = 0; } queueRef.current = null; setRepeatProgress(null); }, []);
+  const clearQueueAndStop = useCallback(() => { playTokenRef.current++; const audio = audioRef.current; if (audio) { audio.pause(); audio.currentTime = 0; } candidateUrlsRef.current = []; candidateIndexRef.current = 0; queueRef.current = null; setRepeatProgress(null); }, []);
   const setReciterId = useCallback((id: string) => { const r = getReciterById(id); if (!r || r.kind === "translation") return; setReciterIdState(id); saveReciterId(id); clearQueueAndStop(); setPlayingKey(null); setCurrentSegmentKind(null); setStatus("idle"); }, [clearQueueAndStop]);
   const setTranslationReciterId = useCallback((id: string) => { const r = getReciterById(id); if (!r || r.kind !== "translation") return; setTranslationReciterIdState(id); clearQueueAndStop(); setPlayingKey(null); setCurrentSegmentKind(null); setStatus("idle"); }, [clearQueueAndStop]);
 
