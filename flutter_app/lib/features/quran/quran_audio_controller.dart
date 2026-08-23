@@ -93,7 +93,7 @@ class QuranAudioController extends ChangeNotifier {
   }
 
   void setRepeat(int value) {
-    _repeat = value.clamp(1, 51);
+    _repeat = value.clamp(1, 51).toInt();
     notifyListeners();
   }
 
