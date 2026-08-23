@@ -29,7 +29,7 @@ flutter config --no-analytics
 echo "Generating Flutter web platform..."
 flutter create . --platforms web
 
-# Apply Nuur Path branding to the generated web shell and browser tab favicon.
+# Apply Nuur Path branding to the generated web shell, favicon and installed PWA icon.
 cp assets/nuur_path_logo.svg web/favicon.svg
 python3 - <<'PY'
 from pathlib import Path
@@ -42,20 +42,29 @@ s = p.read_text()
 # Browser tab title.
 s = re.sub(r'<title>.*?</title>', '<title>Nuur Path</title>', s, count=1, flags=re.S)
 
-# Remove Flutter's generated favicon/icon tags so Chrome cannot keep selecting
-# the old default Flutter icon. Then add the Nuur Path logo as the only favicon.
+# Remove Flutter's generated favicon and Apple icon references.
 s = re.sub(r'^\s*<link[^>]+rel=["\'](?:icon|shortcut icon)["\'][^>]*>\s*\n?', '', s, flags=re.M | re.I)
 s = re.sub(r'^\s*<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>\s*\n?', '', s, flags=re.M | re.I)
-s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-2">\n  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-2">\n</head>')
+
+# Use only the Nuur Path logo for the browser icon.
+s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-3">\n  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-3">\n</head>')
 p.write_text(s)
 
-# Update installed/PWA branding too.
+# Update installed/PWA branding and REPLACE Flutter's default icon entries.
 m = Path('web/manifest.json')
 if m.exists():
     data = json.loads(m.read_text())
     data['name'] = 'Nuur Path'
     data['short_name'] = 'Nuur Path'
     data['description'] = 'Your Quran journey, one ayah at a time.'
+    data['icons'] = [
+        {
+            'src': 'favicon.svg?v=nuur-path-3',
+            'sizes': 'any',
+            'type': 'image/svg+xml',
+            'purpose': 'any maskable'
+        }
+    ]
     m.write_text(json.dumps(data, indent=2) + '\n')
 PY
 
