@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../quran/quran_service.dart';
 
@@ -61,10 +62,36 @@ class _HomePageState extends State<HomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Assalamu Alaikum', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+                Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.18), blurRadius: 20, spreadRadius: 1)],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: SvgPicture.asset('assets/nuur_path_logo.svg'),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Nuur Path', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.6)),
+                          const SizedBox(height: 2),
+                          Text('Your journey. His words.', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text('Assalamu Alaikum', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Text('Your Quran and Hifz companion — Arabic, translations, recitation and memorization tools in one place.', style: theme.textTheme.bodyLarge),
-                const SizedBox(height: 24),
+                Text('Read, listen, memorize and stay consistent — Arabic, translations, recitation and Hifz tools in one place.', style: theme.textTheme.bodyLarge),
+                const SizedBox(height: 28),
                 Row(children: [
                   Text('Daily Ayah', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   const Spacer(),
@@ -122,6 +149,8 @@ class _HomePageState extends State<HomePage> {
                     _ActionCard(icon: Icons.auto_graph_rounded, title: 'My Hifz', subtitle: 'Progress and revision tools are under active development.', onTap: () => widget.onNavigate(3)),
                   ],
                 ),
+                const SizedBox(height: 32),
+                Text('Nuur Path • Your journey, His words.', textAlign: TextAlign.center, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
