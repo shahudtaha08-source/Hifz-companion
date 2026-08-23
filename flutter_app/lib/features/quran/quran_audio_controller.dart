@@ -42,6 +42,7 @@ class QuranAudioController extends ChangeNotifier {
   int _round = 1;
   Reciter _reciter = reciters.first;
   bool _arabicThenUrdu = false;
+  VoidCallback? onSequenceComplete;
 
   QuranAudioController() {
     _indexSub = _player.currentIndexStream.listen((index) {
@@ -51,7 +52,10 @@ class QuranAudioController extends ChangeNotifier {
       _round = sourcePerRound == 0 ? 1 : (index ~/ sourcePerRound) + 1;
       notifyListeners();
     });
-    _stateSub = _player.playerStateStream.listen((_) => notifyListeners());
+    _stateSub = _player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) onSequenceComplete?.call();
+      notifyListeners();
+    });
   }
 
   final ValueNotifier<AyahData?> currentAyah = ValueNotifier(null);
