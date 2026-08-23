@@ -21,44 +21,45 @@ fi
 export FLUTTER_ROOT="${FLUTTER_ROOT}"
 export PATH="${FLUTTER_ROOT}/bin:${FLUTTER_ROOT}/bin/cache/dart-sdk/bin:${PATH}"
 
-echo "Using Flutter:"
-command -v flutter
-flutter --version
 flutter config --no-analytics
-
-echo "Generating Flutter web platform..."
 flutter create . --platforms web
 
-# Apply Nuur Path branding to the generated web shell.
-# IMPORTANT: Keep Flutter's generated PNG manifest icons because browsers use
-# those valid raster icons to determine whether the site can be installed as a PWA.
+# Keep ONE Nuur Path source logo and explicitly apply it to BOTH web/PWA icons.
 cp assets/nuur_path_logo.svg web/favicon.svg
+cp assets/nuur_path_logo.svg web/Icon-192.svg
+cp assets/nuur_path_logo.svg web/Icon-512.svg
+
 python3 - <<'PY'
 from pathlib import Path
 import json
 import re
 
 p = Path('web/index.html')
-s = p.read_text()
+s = p.read_text(encoding='utf-8')
 s = re.sub(r'<title>.*?</title>', '<title>Nuur Path</title>', s, count=1, flags=re.S)
-s = re.sub(r'^\s*<link[^>]+rel=["\'](?:icon|shortcut icon)["\'][^>]*>\s*\n?', '', s, flags=re.M | re.I)
-s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-4">\n  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-4">\n</head>')
-p.write_text(s)
+s = re.sub(r'^\s*<link[^>]+rel=["\'](?:icon|shortcut icon|apple-touch-icon)["\'][^>]*>\s*\n?', '', s, flags=re.M | re.I)
+branding = '''  <!-- Nuur Path desktop/browser icon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-6">
+  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-6">
+  <link rel="apple-touch-icon" href="Icon-192.svg?v=nuur-path-6">
+'''
+s = s.replace('</head>', branding + '</head>')
+p.write_text(s, encoding='utf-8')
 
-# Keep generated PNG icons intact so Chrome/Android installation remains available.
 m = Path('web/manifest.json')
-if m.exists():
-    data = json.loads(m.read_text())
-    data['name'] = 'Nuur Path'
-    data['short_name'] = 'Nuur Path'
-    data['description'] = 'Your Quran journey, one ayah at a time.'
-    m.write_text(json.dumps(data, indent=2) + '\n')
+data = json.loads(m.read_text(encoding='utf-8'))
+data['name'] = 'Nuur Path'
+data['short_name'] = 'Nuur Path'
+data['description'] = 'Your Quran journey, one ayah at a time.'
+# Force installed web/PWA surfaces to use the same Nuur Path logo too.
+data['icons'] = [
+    {'src': 'Icon-192.svg?v=nuur-path-6', 'sizes': '192x192', 'type': 'image/svg+xml', 'purpose': 'any'},
+    {'src': 'Icon-512.svg?v=nuur-path-6', 'sizes': '512x512', 'type': 'image/svg+xml', 'purpose': 'any maskable'}
+]
+m.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
 PY
 
-echo "Getting Flutter dependencies..."
 flutter pub get
-
-echo "Building Nuur Path web app..."
 flutter build web --release
 
-echo "Build completed successfully."
+echo "Build completed: Nuur Path icon applied to browser tab, desktop shortcut and installed PWA."
