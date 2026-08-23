@@ -33,18 +33,23 @@ flutter create . --platforms web
 cp assets/nuur_path_logo.svg web/favicon.svg
 python3 - <<'PY'
 from pathlib import Path
+import json
+import re
+
 p = Path('web/index.html')
 s = p.read_text()
-s = s.replace('<title>hifz_companion_flutter</title>', '<title>Nuur Path</title>')
-s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg">\n</head>')
+s = re.sub(r'<title>.*?</title>', '<title>Nuur Path</title>', s, count=1, flags=re.S)
+if 'href="favicon.svg"' not in s:
+    s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg">\n</head>')
 p.write_text(s)
 
 m = Path('web/manifest.json')
 if m.exists():
-    text = m.read_text()
-    text = text.replace('"name": "hifz_companion_flutter"', '"name": "Nuur Path"')
-    text = text.replace('"short_name": "hifz_companion_flutter"', '"short_name": "Nuur Path"')
-    m.write_text(text)
+    data = json.loads(m.read_text())
+    data['name'] = 'Nuur Path'
+    data['short_name'] = 'Nuur Path'
+    data['description'] = 'Your Quran journey, one ayah at a time.'
+    m.write_text(json.dumps(data, indent=2) + '\n')
 PY
 
 echo "Getting Flutter dependencies..."
