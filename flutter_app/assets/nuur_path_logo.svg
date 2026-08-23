@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="42" y1="34" x2="470" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B292A"/><stop offset="0.55" stop-color="#082022"/><stop offset="1" stop-color="#041012"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="88" y1="72" x2="412" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF7F0"/><stop offset="0.38" stop-color="#55D2B1"/><stop offset="1" stop-color="#12705F"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="316" y1="82" x2="398" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF4C9"/><stop offset="0.45" stop-color="#F3C46D"/><stop offset="1" stop-color="#B67523"/>
+    </linearGradient>
+    <filter id="glow" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="9" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="18" y="18" width="476" height="476" rx="118" fill="url(#bg)" stroke="#67D9BD" stroke-opacity="0.45" stroke-width="3"/>
+  <path d="M38 361C116 340 168 367 237 412C307 457 384 445 476 388" stroke="#28A98C" stroke-width="33" stroke-linecap="round" opacity="0.48"/>
+  <path d="M31 406C128 365 183 412 249 444C324 480 399 444 480 405" stroke="#0F6659" stroke-width="26" stroke-linecap="round" opacity="0.7"/>
+  <path d="M162 342C111 292 140 229 191 179C231 139 242 101 225 70C295 124 253 204 209 244C178 273 178 311 213 331C232 342 248 358 249 385C225 352 196 344 162 342Z" fill="url(#mint)"/>
+  <path d="M340 160C282 207 285 266 347 322C380 352 390 390 368 432C442 363 419 280 369 235C335 204 334 181 356 164C369 153 378 139 380 121C365 140 352 151 340 160Z" fill="url(#mint)"/>
+  <path d="M385 87C351 92 324 121 324 157C324 194 354 224 391 224C415 224 437 211 450 191C438 198 425 202 411 202C373 202 343 171 343 133C343 114 351 97 364 85C371 79 379 74 385 72V87Z" fill="url(#gold)" filter="url(#glow)"/>
+  <path d="M264 224L272 247L295 255L272 263L264 286L256 263L233 255L256 247L264 224Z" fill="#FFE6A3" filter="url(#glow)"/>
+  <circle cx="126" cy="228" r="7" fill="#69E5C5"/><circle cx="290" cy="154" r="5" fill="#69E5C5"/><circle cx="311" cy="206" r="4" fill="#69E5C5"/>
+</svg>
