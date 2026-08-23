@@ -1,7 +1,7 @@
 name: nuur_path
 description: Nuur Path — your Quran journey, one ayah at a time.
 publish_to: "none"
-version: 0.3.2+5
+version: 0.3.3+6
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
