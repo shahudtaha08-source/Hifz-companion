@@ -29,10 +29,28 @@ flutter config --no-analytics
 echo "Generating Flutter web platform..."
 flutter create . --platforms web
 
+# Apply Nuur Path branding to the generated web shell.
+cp assets/nuur_path_logo.svg web/favicon.svg
+python3 - <<'PY'
+from pathlib import Path
+p = Path('web/index.html')
+s = p.read_text()
+s = s.replace('<title>hifz_companion_flutter</title>', '<title>Nuur Path</title>')
+s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg">\n</head>')
+p.write_text(s)
+
+m = Path('web/manifest.json')
+if m.exists():
+    text = m.read_text()
+    text = text.replace('"name": "hifz_companion_flutter"', '"name": "Nuur Path"')
+    text = text.replace('"short_name": "hifz_companion_flutter"', '"short_name": "Nuur Path"')
+    m.write_text(text)
+PY
+
 echo "Getting Flutter dependencies..."
 flutter pub get
 
-echo "Building Flutter web app..."
+echo "Building Nuur Path web app..."
 flutter build web --release
 
 echo "Build completed successfully."
