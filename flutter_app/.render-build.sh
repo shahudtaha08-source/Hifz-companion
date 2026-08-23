@@ -29,7 +29,9 @@ flutter config --no-analytics
 echo "Generating Flutter web platform..."
 flutter create . --platforms web
 
-# Apply Nuur Path branding to the generated web shell, favicon and installed PWA icon.
+# Apply Nuur Path branding to the generated web shell.
+# IMPORTANT: Keep Flutter's generated PNG manifest icons because browsers use
+# those valid raster icons to determine whether the site can be installed as a PWA.
 cp assets/nuur_path_logo.svg web/favicon.svg
 python3 - <<'PY'
 from pathlib import Path
@@ -38,33 +40,18 @@ import re
 
 p = Path('web/index.html')
 s = p.read_text()
-
-# Browser tab title.
 s = re.sub(r'<title>.*?</title>', '<title>Nuur Path</title>', s, count=1, flags=re.S)
-
-# Remove Flutter's generated favicon and Apple icon references.
 s = re.sub(r'^\s*<link[^>]+rel=["\'](?:icon|shortcut icon)["\'][^>]*>\s*\n?', '', s, flags=re.M | re.I)
-s = re.sub(r'^\s*<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>\s*\n?', '', s, flags=re.M | re.I)
-
-# Use only the Nuur Path logo for the browser icon.
-s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-3">\n  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-3">\n</head>')
+s = s.replace('</head>', '  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-4">\n  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg?v=nuur-path-4">\n</head>')
 p.write_text(s)
 
-# Update installed/PWA branding and REPLACE Flutter's default icon entries.
+# Keep generated PNG icons intact so Chrome/Android installation remains available.
 m = Path('web/manifest.json')
 if m.exists():
     data = json.loads(m.read_text())
     data['name'] = 'Nuur Path'
     data['short_name'] = 'Nuur Path'
     data['description'] = 'Your Quran journey, one ayah at a time.'
-    data['icons'] = [
-        {
-            'src': 'favicon.svg?v=nuur-path-3',
-            'sizes': 'any',
-            'type': 'image/svg+xml',
-            'purpose': 'any maskable'
-        }
-    ]
     m.write_text(json.dumps(data, indent=2) + '\n')
 PY
 
