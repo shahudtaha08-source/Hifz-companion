@@ -11,6 +11,7 @@ class Reciter {
     required this.name,
     required this.edition,
     this.everyAyahFolder,
+    this.alternateEveryAyahFolders = const [],
     this.urdu = false,
     this.preferEveryAyah = false,
   });
@@ -19,17 +20,24 @@ class Reciter {
   final String name;
   final String edition;
   final String? everyAyahFolder;
+  final List<String> alternateEveryAyahFolders;
   final bool urdu;
   final bool preferEveryAyah;
 
   String cdnUrlFor(AyahData ayah) =>
       'https://cdn.islamic.network/quran/audio/128/$edition/${ayah.number}.mp3';
 
-  String? fallbackUrlFor(AyahData ayah) {
-    if (everyAyahFolder == null) return null;
+  List<String> everyAyahUrlsFor(AyahData ayah) {
+    final folders = <String>[
+      if (everyAyahFolder != null) everyAyahFolder!,
+      ...alternateEveryAyahFolders,
+    ];
     final s = ayah.surah.toString().padLeft(3, '0');
     final a = ayah.ayah.toString().padLeft(3, '0');
-    return 'https://everyayah.com/data/$everyAyahFolder/$s$a.mp3';
+    return folders
+        .map((folder) => 'https://everyayah.com/data/$folder/$s$a.mp3')
+        .toSet()
+        .toList();
   }
 }
 
@@ -44,7 +52,18 @@ const reciters = <Reciter>[
   Reciter(id: 'ghamdi', name: 'Saad Al-Ghamdi', edition: 'ar.saadalghamdi', everyAyahFolder: 'Ghamadi_40kbps'),
   Reciter(id: 'ajmy', name: 'Ahmed Al-Ajmi', edition: 'ar.ahmedajamy', everyAyahFolder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net'),
   Reciter(id: 'shamshad', name: 'Shamshad Ali Khan (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_shamshad_ali_khan_46kbps', urdu: true, preferEveryAyah: true),
-  Reciter(id: 'fateh-jalandhari', name: 'Fateh Muhammad Jalandhari (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps', urdu: true, preferEveryAyah: true),
+  Reciter(
+    id: 'fateh-jalandhari',
+    name: 'Fateh Muhammad Jalandhari (Urdu)',
+    edition: 'ur.jalandhry',
+    everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps',
+    alternateEveryAyahFolders: [
+      'translations/urdu_fateh_muhammad_jalandhari_46kbps',
+      'translations/urdu_fateh_muhammad_jalandhry_46kbps',
+    ],
+    urdu: true,
+    preferEveryAyah: true,
+  ),
 ];
 
 class _QueueItem {
@@ -186,14 +205,14 @@ class QuranAudioController extends ChangeNotifier {
     final item = _queue[index];
     currentAyah.value = item.ayah;
 
-    final fallback = item.reciter.fallbackUrlFor(item.ayah);
-    final sources = item.reciter.preferEveryAyah && fallback != null
-        ? <String>[fallback, item.reciter.cdnUrlFor(item.ayah)]
-        : <String>[item.reciter.cdnUrlFor(item.ayah), if (fallback != null) fallback];
+    final everyAyahSources = item.reciter.everyAyahUrlsFor(item.ayah);
+    final sources = item.reciter.preferEveryAyah
+        ? <String>[...everyAyahSources, item.reciter.cdnUrlFor(item.ayah)]
+        : <String>[item.reciter.cdnUrlFor(item.ayah), ...everyAyahSources];
 
     Object? lastError;
     try {
-      for (final source in sources) {
+      for (final source in sources.toSet()) {
         try {
           await _player.stop();
           await _player.setUrl(source);
@@ -208,7 +227,7 @@ class QuranAudioController extends ChangeNotifier {
         }
       }
       _loading = false;
-      _errorMessage = 'Audio for ${item.ayah.surah}:${item.ayah.ayah} could not be loaded. Please try again.';
+      _errorMessage = 'Audio for ${item.ayah.surah}:${item.ayah.ayah} could not be loaded from any available source.';
       notifyListeners();
       await _advance();
     } finally {
