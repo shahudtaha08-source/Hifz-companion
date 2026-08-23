@@ -12,6 +12,7 @@ class Reciter {
     required this.edition,
     this.everyAyahFolder,
     this.urdu = false,
+    this.preferEveryAyah = false,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class Reciter {
   final String edition;
   final String? everyAyahFolder;
   final bool urdu;
+  final bool preferEveryAyah;
 
   String cdnUrlFor(AyahData ayah) =>
       'https://cdn.islamic.network/quran/audio/128/$edition/${ayah.number}.mp3';
@@ -41,7 +43,8 @@ const reciters = <Reciter>[
   Reciter(id: 'abdulbasit', name: 'Abdul Basit Abdus Samad', edition: 'ar.abdulbasitmurattal', everyAyahFolder: 'Abdul_Basit_Murattal_192kbps'),
   Reciter(id: 'ghamdi', name: 'Saad Al-Ghamdi', edition: 'ar.saadalghamdi', everyAyahFolder: 'Ghamadi_40kbps'),
   Reciter(id: 'ajmy', name: 'Ahmed Al-Ajmi', edition: 'ar.ahmedajamy', everyAyahFolder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net'),
-  Reciter(id: 'shamshad', name: 'Shamshad Ali Khan (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_shamshad_ali_khan_46kbps', urdu: true),
+  Reciter(id: 'shamshad', name: 'Shamshad Ali Khan (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_shamshad_ali_khan_46kbps', urdu: true, preferEveryAyah: true),
+  Reciter(id: 'fateh-jalandhari', name: 'Fateh Muhammad Jalandhari (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps', urdu: true, preferEveryAyah: true),
 ];
 
 class _QueueItem {
@@ -183,9 +186,10 @@ class QuranAudioController extends ChangeNotifier {
     final item = _queue[index];
     currentAyah.value = item.ayah;
 
-    final sources = <String>[item.reciter.cdnUrlFor(item.ayah)];
     final fallback = item.reciter.fallbackUrlFor(item.ayah);
-    if (fallback != null) sources.add(fallback);
+    final sources = item.reciter.preferEveryAyah && fallback != null
+        ? <String>[fallback, item.reciter.cdnUrlFor(item.ayah)]
+        : <String>[item.reciter.cdnUrlFor(item.ayah), if (fallback != null) fallback];
 
     Object? lastError;
     try {
