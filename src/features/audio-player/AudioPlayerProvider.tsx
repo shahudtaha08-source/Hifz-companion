@@ -93,8 +93,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       const nextUrl = candidateUrlsRef.current[nextIndex];
       if (nextUrl) {
         candidateIndexRef.current = nextIndex;
-        setStatus("loading"); setErrorMessage(null);
         audio.pause(); audio.src = nextUrl; audio.currentTime = 0; audio.load();
+        setStatus("loading"); setErrorMessage(null);
         audio.play().catch(() => setStatus("loading"));
         return;
       }
