@@ -47,11 +47,58 @@ export function getReciterById(id: string): Reciter | undefined {
 }
 
 const EVERYAYAH_BASE = "https://everyayah.com/data";
+const ALQURAN_CDN_BASE = "https://cdn.islamic.network/quran/audio/64";
 
-export function getAyahAudioUrl(reciterId: string, surahNumber: number, numberInSurah: number): string | null {
-  const reciter = getReciterById(reciterId);
-  if (!reciter || reciter.provider !== "everyayah" || !reciter.providerId) return null;
+// Number of ayahs in each Surah. This lets us compute the global ayah number
+// required by the AlQuran.Cloud audio CDN without another network request.
+const SURAH_AYAH_COUNTS = [
+  7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128,
+  111, 110, 98, 135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73,
+  54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60,
+  49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52,
+  44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29, 19, 36, 25, 22, 17, 19,
+  26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7,
+  3, 6, 3, 5, 4, 5, 6,
+] as const;
+
+function globalAyahNumber(surahNumber: number, numberInSurah: number) {
+  if (surahNumber < 1 || surahNumber > SURAH_AYAH_COUNTS.length) return numberInSurah;
+  let offset = 0;
+  for (let i = 0; i < surahNumber - 1; i++) offset += SURAH_AYAH_COUNTS[i]!;
+  return offset + numberInSurah;
+}
+
+function everyAyahUrl(providerId: string, surahNumber: number, numberInSurah: number) {
   const s = String(surahNumber).padStart(3, "0");
   const a = String(numberInSurah).padStart(3, "0");
-  return `${EVERYAYAH_BASE}/${reciter.providerId}/${s}${a}.mp3`;
+  return `${EVERYAYAH_BASE}/${providerId}/${s}${a}.mp3`;
+}
+
+/**
+ * Returns ordered playback candidates. Fateh Muhammad Jalandhari gets several
+ * historical EveryAyah folder spellings plus the AlQuran.Cloud Urdu edition as
+ * a fallback, so a single mirror or folder-name mismatch does not leave the
+ * selected voice silently broken.
+ */
+export function getAyahAudioUrls(reciterId: string, surahNumber: number, numberInSurah: number): string[] {
+  const reciter = getReciterById(reciterId);
+  if (!reciter || reciter.provider !== "everyayah" || !reciter.providerId) return [];
+
+  const urls = [everyAyahUrl(reciter.providerId, surahNumber, numberInSurah)];
+
+  if (reciter.id === "fateh-muhammad-jalandhari") {
+    const alternateFolders = [
+      "translations/urdu_fateh_muhammad_jalandhari_46kbps",
+      "translations/urdu_fateh_muhammad_jalandhry_46kbps",
+    ];
+    for (const folder of alternateFolders) urls.push(everyAyahUrl(folder, surahNumber, numberInSurah));
+    const global = globalAyahNumber(surahNumber, numberInSurah);
+    urls.push(`${ALQURAN_CDN_BASE}/ur.jalandhry/${global}.mp3`);
+  }
+
+  return [...new Set(urls)];
+}
+
+export function getAyahAudioUrl(reciterId: string, surahNumber: number, numberInSurah: number): string | null {
+  return getAyahAudioUrls(reciterId, surahNumber, numberInSurah)[0] ?? null;
 }
