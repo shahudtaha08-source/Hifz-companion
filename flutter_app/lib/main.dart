@@ -68,8 +68,13 @@ class _ProgressPlaceholder extends StatelessWidget {
         icon: Icons.auto_graph_rounded,
         eyebrow: 'UNDER DEVELOPMENT',
         title: 'My Hifz',
-        body: 'Your progress area will become the local home for memorization status, revision planning and future optional sync.',
-        items: ['Per-surah and per-ayah progress', 'Revision scheduling', 'Local-first data storage', 'Future optional sync'],
+        body: 'The progress section is being built as a proper local-first Hifz workspace. Nothing here pretends to be finished yet.',
+        items: [
+          'Track memorized ayahs and completed surahs',
+          'Revision queue with simple spaced reminders',
+          'Daily and weekly consistency overview',
+          'Local storage first, with optional sync later',
+        ],
       );
 }
 
@@ -98,7 +103,11 @@ class _ConstructionPage extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(18)), child: Icon(icon, size: 30, color: scheme.onPrimaryContainer)),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(18)),
+                      child: Icon(icon, size: 30, color: scheme.onPrimaryContainer),
+                    ),
                     const SizedBox(height: 24),
                     Text(eyebrow, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 1)),
                     const SizedBox(height: 8),
@@ -106,7 +115,27 @@ class _ConstructionPage extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(body, style: theme.textTheme.bodyLarge),
                     const SizedBox(height: 24),
-                    ...items.map((item) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.check_circle_outline_rounded, color: scheme.primary, size: 20), const SizedBox(width: 10), Expanded(child: Text(item))]))),
+                    ...items.map((item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.construction_rounded, color: scheme.primary, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(item)),
+                        ],
+                      ),
+                    )),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant), borderRadius: BorderRadius.circular(14)),
+                      child: Row(children: [
+                        const Icon(Icons.info_outline_rounded),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text('Until this section is implemented, your Quran reading and Tasbih features remain separate and usable.')),
+                      ]),
+                    ),
                   ],
                 ),
               ),
