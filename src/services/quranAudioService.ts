@@ -24,6 +24,15 @@ export const RECITERS: Reciter[] = [
     kind: "translation",
     languageCode: "ur",
   },
+  {
+    id: "fateh-muhammad-jalandhari",
+    displayName: "Fateh Muhammad Jalandhari (Urdu Translation)",
+    provider: "everyayah",
+    providerId: "translations/urdu_fateh_muhammad_jalandhri_46kbps",
+    bitrate: "46kbps",
+    kind: "translation",
+    languageCode: "ur",
+  },
   { id: "al-jumuah", displayName: "Saud Al Jumuah", provider: "unavailable", providerId: "", kind: "arabic" },
 ];
 
