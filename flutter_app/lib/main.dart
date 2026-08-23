@@ -5,16 +5,16 @@ import 'features/home/home_page.dart';
 import 'features/quran/quran_reader_page.dart';
 import 'features/tasbih/tasbih_page.dart';
 
-void main() => runApp(const HifzCompanionApp());
+void main() => runApp(const NuurPathApp());
 
-class HifzCompanionApp extends StatelessWidget {
-  const HifzCompanionApp({super.key});
+class NuurPathApp extends StatelessWidget {
+  const NuurPathApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Hifz Companion',
+      title: 'Nuur Path',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
