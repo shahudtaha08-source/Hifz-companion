@@ -34,10 +34,15 @@ class Reciter {
     ];
     final s = ayah.surah.toString().padLeft(3, '0');
     final a = ayah.ayah.toString().padLeft(3, '0');
-    return folders
-        .map((folder) => 'https://everyayah.com/data/$folder/$s$a.mp3')
-        .toSet()
-        .toList();
+    final file = '$s$a.mp3';
+    final urls = <String>[];
+    for (final folder in folders) {
+      // Some WebViews/CDN routes behave differently with the apex host, so
+      // keep both canonical EveryAyah host forms as independent fallbacks.
+      urls.add('https://everyayah.com/data/$folder/$file');
+      urls.add('https://www.everyayah.com/data/$folder/$file');
+    }
+    return urls.toSet().toList();
   }
 }
 
@@ -56,9 +61,11 @@ const reciters = <Reciter>[
     id: 'fateh-jalandhari',
     name: 'Fateh Muhammad Jalandhari (Urdu)',
     edition: 'ur.jalandhry',
+    // Exact EveryAyah translation folder plus historical spelling variants.
     everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps',
     alternateEveryAyahFolders: [
       'translations/urdu_fateh_muhammad_jalandhari_46kbps',
+      'translations/urdu_fateh_muhammad_jalandhary_46kbps',
       'translations/urdu_fateh_muhammad_jalandhry_46kbps',
     ],
     urdu: true,
@@ -96,6 +103,7 @@ class QuranAudioController extends ChangeNotifier {
   bool _stopped = true;
   String? _errorMessage;
   bool _advancing = false;
+  int _playToken = 0;
   VoidCallback? onSequenceComplete;
 
   Reciter get reciter => _reciter;
@@ -126,8 +134,9 @@ class QuranAudioController extends ChangeNotifier {
 
   Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
     if (ayahs.isEmpty || start < 0 || start >= ayahs.length) return;
-
+    final token = ++_playToken;
     await _player.stop();
+    if (token != _playToken) return;
     _queue = [];
     _queueIndex = -1;
     _round = 1;
@@ -147,7 +156,7 @@ class QuranAudioController extends ChangeNotifier {
       }
     }
 
-    await _playIndex(0);
+    await _playIndex(0, token: token);
   }
 
   Future<void> playSingle(AyahData ayah) => playAyahs([ayah]);
@@ -159,14 +168,14 @@ class QuranAudioController extends ChangeNotifier {
   }
 
   Future<void> resume() async {
-    if (_loading) return;
-    if (_stopped || _queueIndex < 0) return;
+    if (_loading || _stopped || _queueIndex < 0) return;
     _errorMessage = null;
     await _player.play();
     notifyListeners();
   }
 
   Future<void> stop() async {
+    ++_playToken;
     _stopped = true;
     _loading = false;
     _queueIndex = -1;
@@ -191,14 +200,14 @@ class QuranAudioController extends ChangeNotifier {
         onSequenceComplete?.call();
         return;
       }
-      await _playIndex(next);
+      await _playIndex(next, token: _playToken);
     } finally {
       _advancing = false;
     }
   }
 
-  Future<void> _playIndex(int index) async {
-    if (_stopped || index < 0 || index >= _queue.length) return;
+  Future<void> _playIndex(int index, {required int token}) async {
+    if (_stopped || index < 0 || index >= _queue.length || token != _playToken) return;
     _loading = true;
     _errorMessage = null;
     _queueIndex = index;
@@ -211,33 +220,34 @@ class QuranAudioController extends ChangeNotifier {
         : <String>[item.reciter.cdnUrlFor(item.ayah), ...everyAyahSources];
 
     Object? lastError;
-    try {
-      for (final source in sources.toSet()) {
-        try {
-          await _player.stop();
-          await _player.setUrl(source);
-          if (_stopped || _queueIndex != index) return;
-          _loading = false;
-          _round = _roundFor(index);
-          notifyListeners();
-          await _player.play();
-          return;
-        } catch (error) {
-          lastError = error;
-        }
-      }
-      _loading = false;
-      _errorMessage = 'Audio for ${item.ayah.surah}:${item.ayah.ayah} could not be loaded from any available source.';
-      notifyListeners();
-      await _advance();
-    } finally {
-      if (_loading) {
+    for (final source in sources.toSet()) {
+      if (token != _playToken || _stopped || _queueIndex != index) return;
+      try {
+        await _player.stop();
+        if (token != _playToken || _stopped || _queueIndex != index) return;
+        await _player.setUrl(source);
+        if (token != _playToken || _stopped || _queueIndex != index) return;
         _loading = false;
-        if (lastError != null && _errorMessage == null) {
-          _errorMessage = 'Audio playback failed: $lastError';
-        }
+        _round = _roundFor(index);
         notifyListeners();
+        await _player.play();
+        return;
+      } catch (error) {
+        lastError = error;
       }
+    }
+
+    if (token != _playToken) return;
+    _loading = false;
+    _errorMessage = 'Audio for ${item.ayah.surah}:${item.ayah.ayah} could not be loaded from any available source.';
+    notifyListeners();
+    await _advance();
+    if (_loading) {
+      _loading = false;
+      if (lastError != null && _errorMessage == null) {
+        _errorMessage = 'Audio playback failed: $lastError';
+      }
+      notifyListeners();
     }
   }
 
@@ -248,6 +258,7 @@ class QuranAudioController extends ChangeNotifier {
 
   @override
   void dispose() {
+    ++_playToken;
     _stateSub?.cancel();
     currentAyah.dispose();
     _player.dispose();
