@@ -7,6 +7,7 @@ import 'quran_service.dart';
 
 class Reciter {
   const Reciter({required this.id, required this.name, required this.folder, this.urdu = false});
+
   final String id;
   final String name;
   final String folder;
@@ -33,6 +34,23 @@ const reciters = <Reciter>[
 ];
 
 class QuranAudioController extends ChangeNotifier {
+  QuranAudioController() {
+    _indexSub = _player.currentIndexStream.listen((index) {
+      if (index == null || index >= _sourceAyahs.length) return;
+      currentAyah.value = _sourceAyahs[index];
+      final sourcesPerAyah = _arabicThenUrdu && !_reciter.urdu ? 2 : 1;
+      final sourcePerRound = _roundAyahs.length * sourcesPerAyah;
+      _round = sourcePerRound == 0 ? 1 : (index ~/ sourcePerRound) + 1;
+      notifyListeners();
+    });
+    _stateSub = _player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        onSequenceComplete?.call();
+      }
+      notifyListeners();
+    });
+  }
+
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<int?>? _indexSub;
   StreamSubscription<PlayerState>? _stateSub;
@@ -40,26 +58,12 @@ class QuranAudioController extends ChangeNotifier {
   List<AyahData> _roundAyahs = [];
   int _repeat = 1;
   int _round = 1;
-  int _selectedStart = 0;
   Reciter _reciter = reciters.first;
   bool _arabicThenUrdu = false;
   VoidCallback? onSequenceComplete;
 
-  QuranAudioController() {
-    _indexSub = _player.currentIndexStream.listen((index) {
-      if (index == null || index >= _sourceAyahs.length) return;
-      currentAyah.value = _sourceAyahs[index];
-      final segmentsPerRound = _roundAyahs.length * ((_arabicThenUrdu && !_reciter.urdu) ? 2 : 1);
-      _round = segmentsPerRound == 0 ? 1 : (index ~/ segmentsPerRound) + 1;
-      notifyListeners();
-    });
-    _stateSub = _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) onSequenceComplete?.call();
-      notifyListeners();
-    });
-  }
-
   final ValueNotifier<AyahData?> currentAyah = ValueNotifier(null);
+
   Reciter get reciter => _reciter;
   bool get isPlaying => _player.playing;
   bool get arabicThenUrdu => _arabicThenUrdu;
@@ -82,10 +86,9 @@ class QuranAudioController extends ChangeNotifier {
   }
 
   Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
-    if (ayahs.isEmpty) return;
-    final safeStart = start.clamp(0, ayahs.length - 1);
-    _selectedStart = safeStart;
-    _roundAyahs = ayahs.sublist(safeStart);
+    if (ayahs.isEmpty || start >= ayahs.length) return;
+
+    _roundAyahs = ayahs.sublist(start);
     _round = 1;
     final selected = _reciter;
     final urdu = reciters.firstWhere((r) => r.urdu);
@@ -96,6 +99,7 @@ class QuranAudioController extends ChangeNotifier {
       for (final ayah in _roundAyahs) {
         sources.add(AudioSource.uri(Uri.parse(selected.urlFor(ayah)), tag: ayah));
         _sourceAyahs.add(ayah);
+
         if (_arabicThenUrdu && !selected.urdu) {
           sources.add(AudioSource.uri(Uri.parse(urdu.urlFor(ayah)), tag: ayah));
           _sourceAyahs.add(ayah);
@@ -104,8 +108,6 @@ class QuranAudioController extends ChangeNotifier {
     }
 
     await _player.stop();
-    // just_audio 0.9.46 exposes setAudioSource; use a ConcatenatingAudioSource
-    // for queue playback so the project builds against the resolved dependency.
     final playlist = ConcatenatingAudioSource(children: sources);
     await _player.setAudioSource(playlist, initialIndex: 0, initialPosition: Duration.zero);
     currentAyah.value = _roundAyahs.first;
