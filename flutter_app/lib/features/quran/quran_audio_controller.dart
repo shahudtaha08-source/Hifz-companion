@@ -36,7 +36,8 @@ class QuranAudioController extends ChangeNotifier {
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<int?>? _indexSub;
   StreamSubscription<PlayerState>? _stateSub;
-  List<AyahData> _queue = [];
+  List<AyahData> _sourceAyahs = [];
+  List<AyahData> _roundAyahs = [];
   int _repeat = 1;
   int _round = 1;
   Reciter _reciter = reciters.first;
@@ -44,9 +45,10 @@ class QuranAudioController extends ChangeNotifier {
 
   QuranAudioController() {
     _indexSub = _player.currentIndexStream.listen((index) {
-      if (index == null || _queue.isEmpty) return;
-      currentAyah.value = _queue[index % _queue.length];
-      _round = (index ~/ _queue.length) + 1;
+      if (index == null || index >= _sourceAyahs.length) return;
+      currentAyah.value = _sourceAyahs[index];
+      final sourcePerRound = _roundAyahs.length * ((_arabicThenUrdu && !_reciter.urdu) ? 2 : 1);
+      _round = sourcePerRound == 0 ? 1 : (index ~/ sourcePerRound) + 1;
       notifyListeners();
     });
     _stateSub = _player.playerStateStream.listen((_) => notifyListeners());
@@ -74,26 +76,27 @@ class QuranAudioController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> playAyahs(List<AyahData> ayahs, {int start = 0, bool nextSurah = false}) async {
+  Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
     if (ayahs.isEmpty) return;
-    _queue = ayahs;
+    _roundAyahs = ayahs.sublist(start);
     _round = 1;
     final selected = _reciter;
     final urdu = reciters.firstWhere((r) => r.urdu);
     final sources = <AudioSource>[];
-    final repeated = <AyahData>[];
+    _sourceAyahs = [];
     for (var r = 0; r < _repeat; r++) {
-      repeated.addAll(ayahs.sublist(start));
-    }
-    for (final ayah in repeated) {
-      sources.add(AudioSource.uri(Uri.parse(selected.urlFor(ayah)), tag: ayah));
-      if (_arabicThenUrdu && !selected.urdu) {
-        sources.add(AudioSource.uri(Uri.parse(urdu.urlFor(ayah)), tag: ayah));
+      for (final ayah in _roundAyahs) {
+        sources.add(AudioSource.uri(Uri.parse(selected.urlFor(ayah)), tag: ayah));
+        _sourceAyahs.add(ayah);
+        if (_arabicThenUrdu && !selected.urdu) {
+          sources.add(AudioSource.uri(Uri.parse(urdu.urlFor(ayah)), tag: ayah));
+          _sourceAyahs.add(ayah);
+        }
       }
     }
     await _player.stop();
     await _player.setAudioSources(sources, initialIndex: 0, initialPosition: Duration.zero);
-    currentAyah.value = ayahs[start];
+    currentAyah.value = _roundAyahs.first;
     await _player.play();
   }
 
