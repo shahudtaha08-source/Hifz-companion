@@ -6,72 +6,89 @@ import 'package:just_audio/just_audio.dart';
 import 'quran_service.dart';
 
 class Reciter {
-  const Reciter({required this.id, required this.name, required this.folder, this.urdu = false});
+  const Reciter({
+    required this.id,
+    required this.name,
+    required this.edition,
+    this.everyAyahFolder,
+    this.urdu = false,
+  });
 
   final String id;
   final String name;
-  final String folder;
+  final String edition;
+  final String? everyAyahFolder;
   final bool urdu;
 
-  String urlFor(AyahData ayah) {
+  String cdnUrlFor(AyahData ayah) =>
+      'https://cdn.islamic.network/quran/audio/128/$edition/${ayah.number}.mp3';
+
+  String? fallbackUrlFor(AyahData ayah) {
+    if (everyAyahFolder == null) return null;
     final s = ayah.surah.toString().padLeft(3, '0');
     final a = ayah.ayah.toString().padLeft(3, '0');
-    return 'https://everyayah.com/data/$folder/$s$a.mp3';
+    return 'https://everyayah.com/data/$everyAyahFolder/$s$a.mp3';
   }
 }
 
 const reciters = <Reciter>[
-  Reciter(id: 'alafasy', name: 'Mishary Rashid Alafasy', folder: 'Alafasy_128kbps'),
-  Reciter(id: 'sudais', name: 'Abdur-Rahman As-Sudais', folder: 'Abdurrahmaan_As-Sudais_192kbps'),
-  Reciter(id: 'shuraim', name: 'Saud Ash-Shuraim', folder: 'Saood_ash-Shuraym_128kbps'),
-  Reciter(id: 'maher', name: 'Maher Al-Muaiqly', folder: 'MaherAlMuaiqly128kbps'),
-  Reciter(id: 'husary', name: 'Mahmoud Khalil Al-Husary', folder: 'Husary_128kbps'),
-  Reciter(id: 'minshawi', name: 'Mohamed Siddiq Al-Minshawi', folder: 'Minshawy_Murattal_128kbps'),
-  Reciter(id: 'abdulbasit', name: 'Abdul Basit Abdus Samad', folder: 'Abdul_Basit_Murattal_192kbps'),
-  Reciter(id: 'ghamdi', name: 'Saad Al-Ghamdi', folder: 'Ghamadi_40kbps'),
-  Reciter(id: 'ajmy', name: 'Ahmed Al-Ajmi', folder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net'),
-  Reciter(id: 'shamshad', name: 'Shamshad Ali Khan (Urdu)', folder: 'translations/urdu_shamshad_ali_khan_46kbps', urdu: true),
+  Reciter(id: 'alafasy', name: 'Mishary Rashid Alafasy', edition: 'ar.alafasy', everyAyahFolder: 'Alafasy_128kbps'),
+  Reciter(id: 'sudais', name: 'Abdur-Rahman As-Sudais', edition: 'ar.abdurrahmaansudais', everyAyahFolder: 'Abdurrahmaan_As-Sudais_192kbps'),
+  Reciter(id: 'shuraim', name: 'Saud Ash-Shuraim', edition: 'ar.saoodshuraym', everyAyahFolder: 'Saood_ash-Shuraym_128kbps'),
+  Reciter(id: 'maher', name: 'Maher Al-Muaiqly', edition: 'ar.mahermuaiqly', everyAyahFolder: 'MaherAlMuaiqly128kbps'),
+  Reciter(id: 'husary', name: 'Mahmoud Khalil Al-Husary', edition: 'ar.husary', everyAyahFolder: 'Husary_128kbps'),
+  Reciter(id: 'minshawi', name: 'Mohamed Siddiq Al-Minshawi', edition: 'ar.minshawi', everyAyahFolder: 'Minshawy_Murattal_128kbps'),
+  Reciter(id: 'abdulbasit', name: 'Abdul Basit Abdus Samad', edition: 'ar.abdulbasitmurattal', everyAyahFolder: 'Abdul_Basit_Murattal_192kbps'),
+  Reciter(id: 'ghamdi', name: 'Saad Al-Ghamdi', edition: 'ar.saadalghamdi', everyAyahFolder: 'Ghamadi_40kbps'),
+  Reciter(id: 'ajmy', name: 'Ahmed Al-Ajmi', edition: 'ar.ahmedajamy', everyAyahFolder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net'),
+  Reciter(id: 'shamshad', name: 'Shamshad Ali Khan (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_shamshad_ali_khan_46kbps', urdu: true),
 ];
+
+class _QueueItem {
+  const _QueueItem(this.ayah, this.reciter);
+  final AyahData ayah;
+  final Reciter reciter;
+}
 
 class QuranAudioController extends ChangeNotifier {
   QuranAudioController() {
-    _indexSub = _player.currentIndexStream.listen((index) {
-      if (index == null || index >= _sourceAyahs.length) return;
-      currentAyah.value = _sourceAyahs[index];
-      final sourcesPerAyah = _arabicThenUrdu && !_reciter.urdu ? 2 : 1;
-      final sourcePerRound = _roundAyahs.length * sourcesPerAyah;
-      _round = sourcePerRound == 0 ? 1 : (index ~/ sourcePerRound) + 1;
-      notifyListeners();
-    });
     _stateSub = _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
-        onSequenceComplete?.call();
+        _advance();
       }
       notifyListeners();
     });
   }
 
   final AudioPlayer _player = AudioPlayer();
-  StreamSubscription<int?>? _indexSub;
   StreamSubscription<PlayerState>? _stateSub;
-  List<AyahData> _sourceAyahs = [];
-  List<AyahData> _roundAyahs = [];
+  final ValueNotifier<AyahData?> currentAyah = ValueNotifier(null);
+
+  List<_QueueItem> _queue = [];
+  int _queueIndex = -1;
   int _repeat = 1;
   int _round = 1;
   Reciter _reciter = reciters.first;
   bool _arabicThenUrdu = false;
+  bool _loading = false;
+  bool _stopped = true;
+  String? _errorMessage;
+  bool _advancing = false;
   VoidCallback? onSequenceComplete;
-
-  final ValueNotifier<AyahData?> currentAyah = ValueNotifier(null);
 
   Reciter get reciter => _reciter;
   bool get isPlaying => _player.playing;
+  bool get isPaused => !_player.playing && _queueIndex >= 0 && !_stopped;
+  bool get isLoading => _loading;
+  bool get hasActiveQueue => _queue.isNotEmpty && _queueIndex >= 0 && !_stopped;
   bool get arabicThenUrdu => _arabicThenUrdu;
   int get repeat => _repeat;
   int get round => _round;
+  String? get errorMessage => _errorMessage;
 
   void setReciter(Reciter value) {
     _reciter = value;
+    _errorMessage = null;
     notifyListeners();
   }
 
@@ -86,42 +103,128 @@ class QuranAudioController extends ChangeNotifier {
   }
 
   Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
-    if (ayahs.isEmpty || start >= ayahs.length) return;
+    if (ayahs.isEmpty || start < 0 || start >= ayahs.length) return;
 
-    _roundAyahs = ayahs.sublist(start);
+    await _player.stop();
+    _queue = [];
+    _queueIndex = -1;
     _round = 1;
+    _errorMessage = null;
+    _stopped = false;
+
     final selected = _reciter;
     final urdu = reciters.firstWhere((r) => r.urdu);
-    final sources = <AudioSource>[];
-    _sourceAyahs = [];
+    final selectedAyahs = ayahs.sublist(start);
 
-    for (var r = 0; r < _repeat; r++) {
-      for (final ayah in _roundAyahs) {
-        sources.add(AudioSource.uri(Uri.parse(selected.urlFor(ayah)), tag: ayah));
-        _sourceAyahs.add(ayah);
-
+    for (var round = 0; round < _repeat; round++) {
+      for (final ayah in selectedAyahs) {
+        _queue.add(_QueueItem(ayah, selected));
         if (_arabicThenUrdu && !selected.urdu) {
-          sources.add(AudioSource.uri(Uri.parse(urdu.urlFor(ayah)), tag: ayah));
-          _sourceAyahs.add(ayah);
+          _queue.add(_QueueItem(ayah, urdu));
         }
       }
     }
 
-    await _player.stop();
-    final playlist = ConcatenatingAudioSource(children: sources);
-    await _player.setAudioSource(playlist, initialIndex: 0, initialPosition: Duration.zero);
-    currentAyah.value = _roundAyahs.first;
-    await _player.play();
+    await _playIndex(0);
   }
 
   Future<void> playSingle(AyahData ayah) => playAyahs([ayah]);
-  Future<void> pause() => _player.pause();
-  Future<void> resume() => _player.play();
-  Future<void> stop() => _player.stop();
+
+  Future<void> pause() async {
+    if (_stopped || _loading) return;
+    await _player.pause();
+    notifyListeners();
+  }
+
+  Future<void> resume() async {
+    if (_loading) return;
+    if (_stopped || _queueIndex < 0) return;
+    _errorMessage = null;
+    await _player.play();
+    notifyListeners();
+  }
+
+  Future<void> stop() async {
+    _stopped = true;
+    _loading = false;
+    _queueIndex = -1;
+    _queue = [];
+    _round = 1;
+    _errorMessage = null;
+    currentAyah.value = null;
+    await _player.stop();
+    notifyListeners();
+  }
+
+  Future<void> _advance() async {
+    if (_advancing || _stopped || _queueIndex < 0) return;
+    _advancing = true;
+    try {
+      final next = _queueIndex + 1;
+      if (next >= _queue.length) {
+        _stopped = true;
+        _queueIndex = -1;
+        currentAyah.value = null;
+        notifyListeners();
+        onSequenceComplete?.call();
+        return;
+      }
+      await _playIndex(next);
+    } finally {
+      _advancing = false;
+    }
+  }
+
+  Future<void> _playIndex(int index) async {
+    if (_stopped || index < 0 || index >= _queue.length) return;
+    _loading = true;
+    _errorMessage = null;
+    _queueIndex = index;
+    final item = _queue[index];
+    currentAyah.value = item.ayah;
+
+    final sources = <String>[item.reciter.cdnUrlFor(item.ayah)];
+    final fallback = item.reciter.fallbackUrlFor(item.ayah);
+    if (fallback != null) sources.add(fallback);
+
+    Object? lastError;
+    try {
+      for (final source in sources) {
+        try {
+          await _player.stop();
+          await _player.setUrl(source);
+          if (_stopped || _queueIndex != index) return;
+          _loading = false;
+          _round = _roundFor(index);
+          notifyListeners();
+          await _player.play();
+          return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      _loading = false;
+      _errorMessage = 'Audio for ${item.ayah.surah}:${item.ayah.ayah} could not be loaded. Please try again.';
+      notifyListeners();
+      await _advance();
+    } finally {
+      if (_loading) {
+        _loading = false;
+        if (lastError != null && _errorMessage == null) {
+          _errorMessage = 'Audio playback failed: $lastError';
+        }
+        notifyListeners();
+      }
+    }
+  }
+
+  int _roundFor(int index) {
+    final perRound = _queue.isEmpty ? 1 : _queue.length ~/ _repeat;
+    return perRound == 0 ? 1 : (index ~/ perRound) + 1;
+  }
 
   @override
   void dispose() {
-    _indexSub?.cancel();
     _stateSub?.cancel();
     currentAyah.dispose();
     _player.dispose();
