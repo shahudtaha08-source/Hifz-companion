@@ -40,6 +40,7 @@ class QuranAudioController extends ChangeNotifier {
   List<AyahData> _roundAyahs = [];
   int _repeat = 1;
   int _round = 1;
+  int _selectedStart = 0;
   Reciter _reciter = reciters.first;
   bool _arabicThenUrdu = false;
   VoidCallback? onSequenceComplete;
@@ -48,8 +49,8 @@ class QuranAudioController extends ChangeNotifier {
     _indexSub = _player.currentIndexStream.listen((index) {
       if (index == null || index >= _sourceAyahs.length) return;
       currentAyah.value = _sourceAyahs[index];
-      final sourcePerRound = _roundAyahs.length * ((_arabicThenUrdu && !_reciter.urdu) ? 2 : 1);
-      _round = sourcePerRound == 0 ? 1 : (index ~/ sourcePerRound) + 1;
+      final segmentsPerRound = _roundAyahs.length * ((_arabicThenUrdu && !_reciter.urdu) ? 2 : 1);
+      _round = segmentsPerRound == 0 ? 1 : (index ~/ segmentsPerRound) + 1;
       notifyListeners();
     });
     _stateSub = _player.playerStateStream.listen((state) {
@@ -82,12 +83,15 @@ class QuranAudioController extends ChangeNotifier {
 
   Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
     if (ayahs.isEmpty) return;
-    _roundAyahs = ayahs.sublist(start);
+    final safeStart = start.clamp(0, ayahs.length - 1);
+    _selectedStart = safeStart;
+    _roundAyahs = ayahs.sublist(safeStart);
     _round = 1;
     final selected = _reciter;
     final urdu = reciters.firstWhere((r) => r.urdu);
     final sources = <AudioSource>[];
     _sourceAyahs = [];
+
     for (var r = 0; r < _repeat; r++) {
       for (final ayah in _roundAyahs) {
         sources.add(AudioSource.uri(Uri.parse(selected.urlFor(ayah)), tag: ayah));
@@ -98,8 +102,12 @@ class QuranAudioController extends ChangeNotifier {
         }
       }
     }
+
     await _player.stop();
-    await _player.setAudioSources(sources, initialIndex: 0, initialPosition: Duration.zero);
+    // just_audio 0.9.46 exposes setAudioSource; use a ConcatenatingAudioSource
+    // for queue playback so the project builds against the resolved dependency.
+    final playlist = ConcatenatingAudioSource(children: sources);
+    await _player.setAudioSource(playlist, initialIndex: 0, initialPosition: Duration.zero);
     currentAyah.value = _roundAyahs.first;
     await _player.play();
   }
