@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'core/app_theme.dart';
 import 'features/home/home_page.dart';
+import 'features/mutashabihat/mutashabihat_page.dart';
 import 'features/quran/quran_reader_page.dart';
 import 'features/tasbih/tasbih_page.dart';
 
@@ -40,6 +41,7 @@ class _AppShellState extends State<AppShell> {
       HomePage(onNavigate: _navigate),
       const QuranReaderPage(),
       const TasbihPage(),
+      const MutashabihatPage(),
       const _ProgressPlaceholder(),
     ];
 
@@ -53,6 +55,7 @@ class _AppShellState extends State<AppShell> {
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book_rounded), label: 'Reader'),
           NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle_rounded), label: 'Tasbih'),
+          NavigationDestination(icon: Icon(Icons.auto_awesome_motion_outlined), selectedIcon: Icon(Icons.auto_awesome_motion_rounded), label: 'Mutashabihat'),
           NavigationDestination(icon: Icon(Icons.auto_graph_outlined), selectedIcon: Icon(Icons.auto_graph_rounded), label: 'Progress'),
         ],
       ),
@@ -133,7 +136,7 @@ class _ConstructionPage extends StatelessWidget {
                       child: Row(children: [
                         const Icon(Icons.info_outline_rounded),
                         const SizedBox(width: 10),
-                        Expanded(child: Text('Until this section is implemented, your Quran reading and Tasbih features remain separate and usable.')),
+                        Expanded(child: Text('Until this section is implemented, your Quran Reader, Mutashabihat Finder and Tasbih features remain separate and usable.')),
                       ]),
                     ),
                   ],
