@@ -1,20 +1,57 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../quran/quran_service.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.onNavigate});
 
   final ValueChanged<int> onNavigate;
 
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late DateTime _today;
+  Timer? _midnightTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _today = _dateOnly(DateTime.now());
+    _scheduleMidnightRefresh();
+  }
+
+  DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
+
   int get _dailyAyahNumber {
-    final day = DateTime.now().toUtc().difference(DateTime.utc(2024, 1, 1)).inDays;
+    final day = _today.difference(DateTime(2024, 1, 1)).inDays;
     return (day % 6236) + 1;
+  }
+
+  void _scheduleMidnightRefresh() {
+    _midnightTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    _midnightTimer = Timer(nextMidnight.difference(now) + const Duration(seconds: 1), () {
+      if (!mounted) return;
+      setState(() => _today = _dateOnly(DateTime.now()));
+      _scheduleMidnightRefresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _midnightTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dailyAyahNumber = _dailyAyahNumber;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth > 700 ? 32 : 20, vertical: 24),
@@ -28,10 +65,15 @@ class HomePage extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text('Your Quran and Hifz companion — Arabic, translations, recitation and memorization tools in one place.', style: theme.textTheme.bodyLarge),
                 const SizedBox(height: 24),
-                Text('Daily Ayah', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                Row(children: [
+                  Text('Daily Ayah', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  const Spacer(),
+                  Text('${_today.day.toString().padLeft(2, '0')}/${_today.month.toString().padLeft(2, '0')}/${_today.year}', style: theme.textTheme.labelMedium),
+                ]),
                 const SizedBox(height: 10),
                 FutureBuilder<AyahData>(
-                  future: QuranService.loadAyah(_dailyAyahNumber),
+                  key: ValueKey(dailyAyahNumber),
+                  future: QuranService.loadAyah(dailyAyahNumber),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Card(child: Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator())));
@@ -60,7 +102,7 @@ class HomePage extends StatelessWidget {
                             const SizedBox(height: 10),
                             Text(ayah.urdu, textDirection: TextDirection.rtl, textAlign: TextAlign.right, style: theme.textTheme.bodyLarge),
                             const SizedBox(height: 16),
-                            Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => onNavigate(1), icon: const Icon(Icons.menu_book_rounded), label: const Text('Open Quran Reader'))),
+                            Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => widget.onNavigate(1), icon: const Icon(Icons.menu_book_rounded), label: const Text('Open Quran Reader'))),
                           ],
                         ),
                       ),
@@ -74,10 +116,10 @@ class HomePage extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _ActionCard(icon: Icons.menu_book_rounded, title: 'Quran Reader', subtitle: 'Read the complete Quran with translations and transliteration.', onTap: () => onNavigate(1)),
-                    _ActionCard(icon: Icons.play_circle_outline_rounded, title: 'Recitation', subtitle: 'Choose a reciter, play ayahs, repeat and continue.', onTap: () => onNavigate(1)),
-                    _ActionCard(icon: Icons.add_circle_outline_rounded, title: 'Tasbih', subtitle: 'Keep your dhikr count with a custom target.', onTap: () => onNavigate(2)),
-                    _ActionCard(icon: Icons.auto_graph_rounded, title: 'My Hifz', subtitle: 'Progress and revision tools are being expanded.', onTap: () => onNavigate(3)),
+                    _ActionCard(icon: Icons.menu_book_rounded, title: 'Quran Reader', subtitle: 'Read the complete Quran with translations and transliteration.', onTap: () => widget.onNavigate(1)),
+                    _ActionCard(icon: Icons.play_circle_outline_rounded, title: 'Recitation', subtitle: 'Choose a reciter, play ayahs, repeat and continue.', onTap: () => widget.onNavigate(1)),
+                    _ActionCard(icon: Icons.add_circle_outline_rounded, title: 'Tasbih', subtitle: 'Keep your dhikr count with a custom target.', onTap: () => widget.onNavigate(2)),
+                    _ActionCard(icon: Icons.auto_graph_rounded, title: 'My Hifz', subtitle: 'Progress and revision tools are under active development.', onTap: () => widget.onNavigate(3)),
                   ],
                 ),
               ],
