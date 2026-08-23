@@ -23,7 +23,6 @@ class AyahData {
 
 class SurahData {
   const SurahData({required this.number, required this.name, required this.englishName, required this.ayahs});
-
   final int number;
   final String name;
   final String englishName;
@@ -42,7 +41,7 @@ class QuranService {
       if (response.statusCode != 200) throw HttpException('Quran data request failed: ${response.statusCode}');
       final text = await utf8.decoder.bind(response).join();
       final decoded = jsonDecode(text) as Map<String, dynamic>;
-      if (decoded['code'] != 200) throw const HttpException('Quran data is unavailable');
+      if (decoded['code'] != 200) throw HttpException('Quran data is unavailable');
       return decoded['data'];
     } finally {
       client.close(force: true);
@@ -74,12 +73,7 @@ class QuranService {
         transliteration: translitAyahs[i]['text'] as String,
       );
     });
-    final result = SurahData(
-      number: number,
-      name: arabic['name'] as String,
-      englishName: arabic['englishName'] as String,
-      ayahs: ayahs,
-    );
+    final result = SurahData(number: number, name: arabic['name'] as String, englishName: arabic['englishName'] as String, ayahs: ayahs);
     _surahCache[number] = result;
     return result;
   }
