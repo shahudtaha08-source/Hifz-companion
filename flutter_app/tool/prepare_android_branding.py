@@ -19,9 +19,11 @@ DENSITIES = {
 for folder in (DRAWABLE, MIPMAP_ANY, MIPMAP_V26, *(RES / d for d in DENSITIES)):
     folder.mkdir(parents=True, exist_ok=True)
 
-# This script deliberately writes REAL PNG launcher files into every Android
-# density bucket. The previous XML-only approach could still lose resource
-# resolution to Flutter's generated PNG launcher icons on some devices.
+# Use a UNIQUE resource name instead of Flutter's default ic_launcher. This
+# prevents Android/launcher caches from resolving the old generated Flutter icon.
+ICON_NAME = "nuur_path_launcher"
+ROUND_ICON_NAME = "nuur_path_launcher_round"
+
 def png_rgba(path, width, height, pixels):
     raw = bytearray()
     stride = width * 4
@@ -53,12 +55,9 @@ def make_icon(size):
         if na <= 0:
             return
         for c in range(3):
-            src = rgba[c]
-            dst = px[i+c]
-            px[i+c] = int((src * a + dst * oa * (1-a)) / na)
+            px[i+c] = int((rgba[c] * a + px[i+c] * oa * (1-a)) / na)
         px[i+3] = int(na * 255)
 
-    # Rounded dark app tile.
     r = size * 0.18
     for y in range(size):
         for x in range(size):
@@ -67,8 +66,6 @@ def make_icon(size):
             inside = min(dx, dy) >= r or ((max(r-dx, 0))**2 + (max(r-dy, 0))**2 <= r*r)
             if inside:
                 setpx(x, y, (6, 26, 27, 255))
-
-    # Teal waves / path.
     for y in range(int(size * .55), int(size * .94)):
         for x in range(int(size * .08), int(size * .92)):
             xn, yn = x/size, y/size
@@ -78,8 +75,6 @@ def make_icon(size):
                 blend(x, y, (42, 143, 123, 175))
             if abs(yn-y2) < .055:
                 blend(x, y, (15, 102, 89, 210))
-
-    # Central glowing path / flame.
     for y in range(int(size*.23), int(size*.76)):
         for x in range(int(size*.22), int(size*.58)):
             xn, yn = x/size, y/size
@@ -88,8 +83,6 @@ def make_icon(size):
             if abs(xn-cx) < width and yn > .22:
                 alpha = int(210 * (1 - abs(xn-cx)/max(width, .001)))
                 blend(x, y, (85, 210, 177, alpha))
-
-    # Crescent moon.
     cx, cy = .73*size, .30*size
     R = .135*size
     cutx, cuty = .77*size, .27*size
@@ -97,23 +90,19 @@ def make_icon(size):
         for x in range(int(cx-R-2), int(cx+R+2)):
             if (x-cx)**2 + (y-cy)**2 <= R*R and (x-cutx)**2 + (y-cuty)**2 >= (R*.84)**2:
                 setpx(x, y, (243, 196, 109, 255))
-
-    # Small star.
     sx, sy = int(.52*size), int(.48*size)
     for y in range(sy-5, sy+6):
         for x in range(sx-5, sx+6):
-            d = abs(x-sx) + abs(y-sy)
-            if d <= 4:
+            if abs(x-sx) + abs(y-sy) <= 4:
                 setpx(x, y, (255, 230, 163, 255))
     return px
 
 for density, size in DENSITIES.items():
     folder = RES / density
     pixels = make_icon(size)
-    for name in ("ic_launcher.png", "ic_launcher_round.png"):
-        png_rgba(folder / name, size, size, pixels)
+    png_rgba(folder / f"{ICON_NAME}.png", size, size, pixels)
+    png_rgba(folder / f"{ROUND_ICON_NAME}.png", size, size, pixels)
 
-# Keep vector resources too for adaptive-icon foregrounds.
 ICON = '''<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
@@ -127,27 +116,25 @@ ICON = '''<?xml version="1.0" encoding="utf-8"?>
 '''
 (DRAWABLE / "nuur_path_icon.xml").write_text(ICON, encoding="utf-8")
 
-# Base XML resources plus Android 8+ adaptive resources.
-for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
-    (MIPMAP_ANY / name).write_text(ICON, encoding="utf-8")
+# Android 7 and lower use the real PNGs. Android 8+ gets a unique adaptive icon.
 ADAPTIVE = '''<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@android:color/transparent"/>
     <foreground android:drawable="@drawable/nuur_path_icon"/>
 </adaptive-icon>
 '''
-for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
-    (MIPMAP_V26 / name).write_text(ADAPTIVE, encoding="utf-8")
+for name in (ICON_NAME, ROUND_ICON_NAME):
+    (MIPMAP_V26 / f"{name}.xml").write_text(ADAPTIVE, encoding="utf-8")
 
 manifest = ROOT / "android/app/src/main/AndroidManifest.xml"
 if not manifest.exists():
     raise SystemExit("AndroidManifest.xml not found. Run 'flutter create . --platforms android' first.")
 text = manifest.read_text(encoding="utf-8")
-text = re.sub(r'android:icon="[^"]*"', 'android:icon="@mipmap/ic_launcher"', text)
-text = re.sub(r'android:roundIcon="[^"]*"', 'android:roundIcon="@mipmap/ic_launcher_round"', text)
+text = re.sub(r'android:icon="[^"]*"', f'android:icon="@mipmap/{ICON_NAME}"', text)
+text = re.sub(r'android:roundIcon="[^"]*"', f'android:roundIcon="@mipmap/{ROUND_ICON_NAME}"', text)
 text = re.sub(r'android:label="[^"]*"', 'android:label="Nuur Path"', text)
 if 'android:roundIcon=' not in text:
-    text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"')
+    text = text.replace(f'android:icon="@mipmap/{ICON_NAME}"', f'android:icon="@mipmap/{ICON_NAME}" android:roundIcon="@mipmap/{ROUND_ICON_NAME}"')
 manifest.write_text(text, encoding="utf-8")
 
-print("Wrote Nuur Path icon PNGs to every mipmap density, plus round/adaptive icon resources.")
+print("Wrote uniquely named Nuur Path launcher resources and forced the Android manifest to use them.")
