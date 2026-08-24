@@ -37,8 +37,6 @@ class Reciter {
     final file = '$s$a.mp3';
     final urls = <String>[];
     for (final folder in folders) {
-      // Some WebViews/CDN routes behave differently with the apex host, so
-      // keep both canonical EveryAyah host forms as independent fallbacks.
       urls.add('https://everyayah.com/data/$folder/$file');
       urls.add('https://www.everyayah.com/data/$folder/$file');
     }
@@ -61,7 +59,6 @@ const reciters = <Reciter>[
     id: 'fateh-jalandhari',
     name: 'Fateh Muhammad Jalandhari (Urdu)',
     edition: 'ur.jalandhry',
-    // Exact EveryAyah translation folder plus historical spelling variants.
     everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps',
     alternateEveryAyahFolders: [
       'translations/urdu_fateh_muhammad_jalandhari_46kbps',
@@ -82,15 +79,29 @@ class _QueueItem {
 class QuranAudioController extends ChangeNotifier {
   QuranAudioController() {
     _stateSub = _player.playerStateStream.listen((state) {
+      if (state.playing && state.processingState == ProcessingState.ready) {
+        _cancelBufferWatchdog();
+        if (_loading) {
+          _loading = false;
+          notifyListeners();
+        }
+      }
       if (state.processingState == ProcessingState.completed) {
         _advance();
       }
       notifyListeners();
     });
+    _errorSub = _player.playbackEventStream.listen(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {
+        _recoverFromSourceFailure(error);
+      },
+    );
   }
 
   final AudioPlayer _player = AudioPlayer();
   StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<PlaybackEvent>? _errorSub;
   final ValueNotifier<AyahData?> currentAyah = ValueNotifier(null);
 
   List<_QueueItem> _queue = [];
@@ -103,7 +114,11 @@ class QuranAudioController extends ChangeNotifier {
   bool _stopped = true;
   String? _errorMessage;
   bool _advancing = false;
+  bool _recovering = false;
   int _playToken = 0;
+  List<String> _activeSources = const [];
+  int _sourceIndex = -1;
+  Timer? _bufferWatchdog;
   VoidCallback? onSequenceComplete;
 
   Reciter get reciter => _reciter;
@@ -135,6 +150,7 @@ class QuranAudioController extends ChangeNotifier {
   Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
     if (ayahs.isEmpty || start < 0 || start >= ayahs.length) return;
     final token = ++_playToken;
+    _cancelBufferWatchdog();
     await _player.stop();
     if (token != _playToken) return;
     _queue = [];
@@ -146,7 +162,6 @@ class QuranAudioController extends ChangeNotifier {
     final selected = _reciter;
     final urdu = reciters.firstWhere((r) => r.urdu);
     final selectedAyahs = ayahs.sublist(start);
-
     for (var round = 0; round < _repeat; round++) {
       for (final ayah in selectedAyahs) {
         _queue.add(_QueueItem(ayah, selected));
@@ -155,7 +170,6 @@ class QuranAudioController extends ChangeNotifier {
         }
       }
     }
-
     await _playIndex(0, token: token);
   }
 
@@ -163,6 +177,7 @@ class QuranAudioController extends ChangeNotifier {
 
   Future<void> pause() async {
     if (_stopped || _loading) return;
+    _cancelBufferWatchdog();
     await _player.pause();
     notifyListeners();
   }
@@ -171,15 +186,19 @@ class QuranAudioController extends ChangeNotifier {
     if (_loading || _stopped || _queueIndex < 0) return;
     _errorMessage = null;
     await _player.play();
+    _startBufferWatchdog(_playToken, _queueIndex, _sourceIndex);
     notifyListeners();
   }
 
   Future<void> stop() async {
     ++_playToken;
+    _cancelBufferWatchdog();
     _stopped = true;
     _loading = false;
     _queueIndex = -1;
     _queue = [];
+    _activeSources = const [];
+    _sourceIndex = -1;
     _round = 1;
     _errorMessage = null;
     currentAyah.value = null;
@@ -188,13 +207,16 @@ class QuranAudioController extends ChangeNotifier {
   }
 
   Future<void> _advance() async {
-    if (_advancing || _stopped || _queueIndex < 0) return;
+    if (_advancing || _recovering || _stopped || _queueIndex < 0) return;
     _advancing = true;
     try {
       final next = _queueIndex + 1;
       if (next >= _queue.length) {
+        _cancelBufferWatchdog();
         _stopped = true;
         _queueIndex = -1;
+        _activeSources = const [];
+        _sourceIndex = -1;
         currentAyah.value = null;
         notifyListeners();
         onSequenceComplete?.call();
@@ -208,47 +230,90 @@ class QuranAudioController extends ChangeNotifier {
 
   Future<void> _playIndex(int index, {required int token}) async {
     if (_stopped || index < 0 || index >= _queue.length || token != _playToken) return;
+    _cancelBufferWatchdog();
     _loading = true;
     _errorMessage = null;
     _queueIndex = index;
+    _sourceIndex = -1;
     final item = _queue[index];
     currentAyah.value = item.ayah;
 
     final everyAyahSources = item.reciter.everyAyahUrlsFor(item.ayah);
-    final sources = item.reciter.preferEveryAyah
-        ? <String>[...everyAyahSources, item.reciter.cdnUrlFor(item.ayah)]
-        : <String>[item.reciter.cdnUrlFor(item.ayah), ...everyAyahSources];
+    _activeSources = (item.reciter.preferEveryAyah
+            ? <String>[...everyAyahSources, item.reciter.cdnUrlFor(item.ayah)]
+            : <String>[item.reciter.cdnUrlFor(item.ayah), ...everyAyahSources])
+        .toSet()
+        .toList();
 
+    await _tryCurrentAyahSource(token, startAt: 0);
+  }
+
+  Future<void> _tryCurrentAyahSource(int token, {required int startAt}) async {
     Object? lastError;
-    for (final source in sources.toSet()) {
-      if (token != _playToken || _stopped || _queueIndex != index) return;
+    for (var i = startAt; i < _activeSources.length; i++) {
+      if (token != _playToken || _stopped) return;
+      _sourceIndex = i;
       try {
         await _player.stop();
-        if (token != _playToken || _stopped || _queueIndex != index) return;
-        await _player.setUrl(source);
-        if (token != _playToken || _stopped || _queueIndex != index) return;
+        if (token != _playToken || _stopped) return;
+        await _player.setUrl(_activeSources[i]).timeout(const Duration(seconds: 18));
+        if (token != _playToken || _stopped) return;
+        _round = _roundFor(_queueIndex);
         _loading = false;
-        _round = _roundFor(index);
         notifyListeners();
         await _player.play();
+        _startBufferWatchdog(token, _queueIndex, i);
         return;
       } catch (error) {
         lastError = error;
       }
     }
 
-    if (token != _playToken) return;
+    if (token != _playToken || _stopped) return;
     _loading = false;
-    _errorMessage = 'Audio for ${item.ayah.surah}:${item.ayah.ayah} could not be loaded from any available source.';
+    _errorMessage = 'Audio unavailable for the current ayah. Skipping to the next ayah.';
     notifyListeners();
+    if (lastError != null) debugPrint('Nuur Path audio sources failed: $lastError');
     await _advance();
-    if (_loading) {
-      _loading = false;
-      if (lastError != null && _errorMessage == null) {
-        _errorMessage = 'Audio playback failed: $lastError';
+  }
+
+  void _recoverFromSourceFailure(Object error) {
+    if (_recovering || _stopped || _queueIndex < 0) return;
+    final token = _playToken;
+    final index = _queueIndex;
+    _recovering = true;
+    _cancelBufferWatchdog();
+    _loading = true;
+    _errorMessage = 'Connection interrupted. Switching audio source…';
+    notifyListeners();
+    Future<void>(() async {
+      try {
+        if (token != _playToken || _stopped || index != _queueIndex) return;
+        await _tryCurrentAyahSource(token, startAt: _sourceIndex + 1);
+      } catch (_) {
+        if (token == _playToken && !_stopped && index == _queueIndex) {
+          await _advance();
+        }
+      } finally {
+        _recovering = false;
       }
-      notifyListeners();
-    }
+    });
+  }
+
+  void _startBufferWatchdog(int token, int queueIndex, int sourceIndex) {
+    _cancelBufferWatchdog();
+    _bufferWatchdog = Timer(const Duration(seconds: 22), () {
+      if (token != _playToken || _stopped || queueIndex != _queueIndex || sourceIndex != _sourceIndex) return;
+      final state = _player.processingState;
+      if (state == ProcessingState.buffering || state == ProcessingState.loading || !(_player.playing)) {
+        _recoverFromSourceFailure(TimeoutException('Audio source stalled'));
+      }
+    });
+  }
+
+  void _cancelBufferWatchdog() {
+    _bufferWatchdog?.cancel();
+    _bufferWatchdog = null;
   }
 
   int _roundFor(int index) {
@@ -259,7 +324,9 @@ class QuranAudioController extends ChangeNotifier {
   @override
   void dispose() {
     ++_playToken;
+    _cancelBufferWatchdog();
     _stateSub?.cancel();
+    _errorSub?.cancel();
     currentAyah.dispose();
     _player.dispose();
     super.dispose();
