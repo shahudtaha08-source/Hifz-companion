@@ -6,9 +6,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../quran/quran_service.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key, required this.onNavigate});
+  const HomePage({super.key, required this.onNavigate, required this.onToggleTheme});
 
   final ValueChanged<int> onNavigate;
+  final VoidCallback onToggleTheme;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -17,6 +18,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late DateTime _today;
   Timer? _midnightTimer;
+  int _dynamicOffset = 0;
 
   @override
   void initState() {
@@ -29,8 +31,10 @@ class _HomePageState extends State<HomePage> {
 
   int get _dailyAyahNumber {
     final day = _today.difference(DateTime(2024, 1, 1)).inDays;
-    return (day % 6236) + 1;
+    return ((day + _dynamicOffset) % 6236) + 1;
   }
+
+  void _showAnotherAyah() => setState(() => _dynamicOffset = (_dynamicOffset + 1) % 6236);
 
   void _scheduleMidnightRefresh() {
     _midnightTimer?.cancel();
@@ -38,7 +42,10 @@ class _HomePageState extends State<HomePage> {
     final nextMidnight = DateTime(now.year, now.month, now.day + 1);
     _midnightTimer = Timer(nextMidnight.difference(now) + const Duration(seconds: 1), () {
       if (!mounted) return;
-      setState(() => _today = _dateOnly(DateTime.now()));
+      setState(() {
+        _today = _dateOnly(DateTime.now());
+        _dynamicOffset = 0;
+      });
       _scheduleMidnightRefresh();
     });
   }
@@ -53,6 +60,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final dailyAyahNumber = _dailyAyahNumber;
+    final isDark = theme.brightness == Brightness.dark;
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
         padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth > 700 ? 32 : 20, vertical: 24),
@@ -85,6 +93,11 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                     ),
+                    IconButton.filledTonal(
+                      tooltip: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+                      onPressed: widget.onToggleTheme,
+                      icon: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -93,10 +106,12 @@ class _HomePageState extends State<HomePage> {
                 Text('Read, listen, memorize and stay consistent — Arabic, translations, recitation and Hifz tools in one place.', style: theme.textTheme.bodyLarge),
                 const SizedBox(height: 28),
                 Row(children: [
-                  Text('Daily Ayah', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                  Text('Dynamic Daily Ayah', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                   const Spacer(),
                   Text('${_today.day.toString().padLeft(2, '0')}/${_today.month.toString().padLeft(2, '0')}/${_today.year}', style: theme.textTheme.labelMedium),
                 ]),
+                const SizedBox(height: 6),
+                Text(_dynamicOffset == 0 ? 'A fresh ayah is selected automatically every day.' : 'Exploring another ayah — your daily ayah is still saved for today.', style: theme.textTheme.bodySmall),
                 const SizedBox(height: 10),
                 FutureBuilder<AyahData>(
                   key: ValueKey(dailyAyahNumber),
@@ -106,7 +121,7 @@ class _HomePageState extends State<HomePage> {
                       return const Card(child: Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator())));
                     }
                     if (snapshot.hasError || !snapshot.hasData) {
-                      return Card(child: Padding(padding: const EdgeInsets.all(20), child: Text('Today\'s ayah could not be loaded. Open Reader and try again when connected.')));
+                      return Card(child: Padding(padding: const EdgeInsets.all(20), child: Text('This ayah could not be loaded. Open Reader and try again when connected.')));
                     }
                     final ayah = snapshot.data!;
                     return Card(
@@ -116,8 +131,7 @@ class _HomePageState extends State<HomePage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Row(children: [
-                              Text('Surah ${ayah.surah} • Ayah ${ayah.ayah}', style: theme.textTheme.labelLarge),
-                              const Spacer(),
+                              Expanded(child: Text('Surah ${ayah.surah} • Ayah ${ayah.ayah}', style: theme.textTheme.labelLarge)),
                               const Icon(Icons.calendar_today_outlined, size: 18),
                             ]),
                             const SizedBox(height: 18),
@@ -128,8 +142,16 @@ class _HomePageState extends State<HomePage> {
                             Text(ayah.english, style: theme.textTheme.bodyLarge),
                             const SizedBox(height: 10),
                             Text(ayah.urdu, textDirection: TextDirection.rtl, textAlign: TextAlign.right, style: theme.textTheme.bodyLarge),
-                            const SizedBox(height: 16),
-                            Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => widget.onNavigate(1), icon: const Icon(Icons.menu_book_rounded), label: const Text('Open Quran Reader'))),
+                            const SizedBox(height: 18),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              alignment: WrapAlignment.spaceBetween,
+                              children: [
+                                FilledButton.tonalIcon(onPressed: _showAnotherAyah, icon: const Icon(Icons.shuffle_rounded), label: const Text('Another Ayah')),
+                                FilledButton.icon(onPressed: () => widget.onNavigate(1), icon: const Icon(Icons.menu_book_rounded), label: const Text('Open Quran Reader')),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -146,7 +168,7 @@ class _HomePageState extends State<HomePage> {
                     _ActionCard(icon: Icons.menu_book_rounded, title: 'Quran Reader', subtitle: 'Read the complete Quran with translations and transliteration.', onTap: () => widget.onNavigate(1)),
                     _ActionCard(icon: Icons.play_circle_outline_rounded, title: 'Recitation', subtitle: 'Choose a reciter, play ayahs, repeat and continue.', onTap: () => widget.onNavigate(1)),
                     _ActionCard(icon: Icons.add_circle_outline_rounded, title: 'Tasbih', subtitle: 'Keep your dhikr count with a custom target.', onTap: () => widget.onNavigate(2)),
-                    _ActionCard(icon: Icons.auto_graph_rounded, title: 'My Hifz', subtitle: 'Progress and revision tools are under active development.', onTap: () => widget.onNavigate(3)),
+                    _ActionCard(icon: Icons.auto_graph_rounded, title: 'My Hifz', subtitle: 'Progress and revision tools are under active development.', onTap: () => widget.onNavigate(4)),
                   ],
                 ),
                 const SizedBox(height: 32),
