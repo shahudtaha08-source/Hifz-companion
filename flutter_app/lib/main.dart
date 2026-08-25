@@ -8,8 +8,23 @@ import 'features/tasbih/tasbih_page.dart';
 
 void main() => runApp(const NuurPathApp());
 
-class NuurPathApp extends StatelessWidget {
+class NuurPathApp extends StatefulWidget {
   const NuurPathApp({super.key});
+
+  @override
+  State<NuurPathApp> createState() => _NuurPathAppState();
+}
+
+class _NuurPathAppState extends State<NuurPathApp> {
+  ThemeMode _themeMode = ThemeMode.system;
+
+  void _toggleTheme() {
+    setState(() {
+      final platformDark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+      final currentlyDark = _themeMode == ThemeMode.dark || (_themeMode == ThemeMode.system && platformDark);
+      _themeMode = currentlyDark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,14 +33,15 @@ class NuurPathApp extends StatelessWidget {
       title: 'Nuur Path',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      home: const AppShell(),
+      themeMode: _themeMode,
+      home: AppShell(onToggleTheme: _toggleTheme),
     );
   }
 }
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, required this.onToggleTheme});
+  final VoidCallback onToggleTheme;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -38,7 +54,7 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomePage(onNavigate: _navigate),
+      HomePage(onNavigate: _navigate, onToggleTheme: widget.onToggleTheme),
       const QuranReaderPage(),
       const TasbihPage(),
       const MutashabihatPage(),
@@ -129,16 +145,6 @@ class _ConstructionPage extends StatelessWidget {
                         ],
                       ),
                     )),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(border: Border.all(color: scheme.outlineVariant), borderRadius: BorderRadius.circular(14)),
-                      child: Row(children: [
-                        const Icon(Icons.info_outline_rounded),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text('Until this section is implemented, your Quran Reader, Mutashabihat Finder and Tasbih features remain separate and usable.')),
-                      ]),
-                    ),
                   ],
                 ),
               ),
