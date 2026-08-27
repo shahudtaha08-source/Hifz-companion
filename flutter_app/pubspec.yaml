@@ -1,7 +1,7 @@
-name: nuur_path
-description: Nuur Path — your Quran journey, one ayah at a time.
+name: miqra
+description: Miqra — a local-first Quran, Hifz and revision companion.
 publish_to: "none"
-version: 0.3.5+8
+version: 0.4.0+9
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
