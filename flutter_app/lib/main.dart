@@ -6,16 +6,16 @@ import 'features/mutashabihat/mutashabihat_page.dart';
 import 'features/quran/quran_reader_page.dart';
 import 'features/tasbih/tasbih_page.dart';
 
-void main() => runApp(const NuurPathApp());
+void main() => runApp(const MiqraApp());
 
-class NuurPathApp extends StatefulWidget {
-  const NuurPathApp({super.key});
+class MiqraApp extends StatefulWidget {
+  const MiqraApp({super.key});
 
   @override
-  State<NuurPathApp> createState() => _NuurPathAppState();
+  State<MiqraApp> createState() => _MiqraAppState();
 }
 
-class _NuurPathAppState extends State<NuurPathApp> {
+class _MiqraAppState extends State<MiqraApp> {
   ThemeMode _themeMode = ThemeMode.system;
 
   void _toggleTheme() {
@@ -30,7 +30,7 @@ class _NuurPathAppState extends State<NuurPathApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Nuur Path',
+      title: 'Miqra',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: _themeMode,
@@ -85,9 +85,9 @@ class _ProgressPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const _ConstructionPage(
         icon: Icons.auto_graph_rounded,
-        eyebrow: 'UNDER DEVELOPMENT',
+        eyebrow: 'MIGRATION IN PROGRESS',
         title: 'My Hifz',
-        body: 'The progress section is being built as a proper local-first Hifz workspace. Nothing here pretends to be finished yet.',
+        body: 'Miqra is moving the existing Hifz Companion experience into one Flutter codebase. Progress will be completed with local-first tracking and revision tools.',
         items: [
           'Track memorized ayahs and completed surahs',
           'Revision queue with simple spaced reminders',
