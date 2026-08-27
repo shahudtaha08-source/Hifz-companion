@@ -53,12 +53,15 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // The navigation now follows the actual Hifz Companion product structure.
+    // Flutter is being migrated from the working web app feature-by-feature;
+    // this is not a separate placeholder product.
     final pages = [
       HomePage(onNavigate: _navigate, onToggleTheme: widget.onToggleTheme),
       const QuranReaderPage(),
-      const TasbihPage(),
+      const _MyHifzPage(),
       const MutashabihatPage(),
-      const _ProgressPlaceholder(),
+      const TasbihPage(),
     ];
 
     return Scaffold(
@@ -69,30 +72,30 @@ class _AppShellState extends State<AppShell> {
         onDestinationSelected: _navigate,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home_rounded), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book_rounded), label: 'Reader'),
-          NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle_rounded), label: 'Tasbih'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book_rounded), label: 'Quran'),
+          NavigationDestination(icon: Icon(Icons.auto_graph_outlined), selectedIcon: Icon(Icons.auto_graph_rounded), label: 'My Hifz'),
           NavigationDestination(icon: Icon(Icons.auto_awesome_motion_outlined), selectedIcon: Icon(Icons.auto_awesome_motion_rounded), label: 'Mutashabihat'),
-          NavigationDestination(icon: Icon(Icons.auto_graph_outlined), selectedIcon: Icon(Icons.auto_graph_rounded), label: 'Progress'),
+          NavigationDestination(icon: Icon(Icons.add_circle_outline), selectedIcon: Icon(Icons.add_circle_rounded), label: 'Tasbih'),
         ],
       ),
     );
   }
 }
 
-class _ProgressPlaceholder extends StatelessWidget {
-  const _ProgressPlaceholder();
+class _MyHifzPage extends StatelessWidget {
+  const _MyHifzPage();
 
   @override
   Widget build(BuildContext context) => const _ConstructionPage(
         icon: Icons.auto_graph_rounded,
-        eyebrow: 'MIGRATION IN PROGRESS',
+        eyebrow: 'MIGRATING FROM THE WORKING APP',
         title: 'My Hifz',
-        body: 'Miqra is moving the existing Hifz Companion experience into one Flutter codebase. Progress will be completed with local-first tracking and revision tools.',
+        body: 'This screen is being rebuilt from the existing Hifz Companion Hifz workflow, including memorization status, revision and weak-ayah tracking.',
         items: [
-          'Track memorized ayahs and completed surahs',
-          'Revision queue with simple spaced reminders',
-          'Daily and weekly consistency overview',
-          'Local storage first, with optional sync later',
+          'Continue memorizing from the current ayah',
+          'Track memorized, learning, weak and revision states',
+          'Revision queue and weak-ayah review',
+          'Local-first progress with export/import later',
         ],
       );
 }
@@ -139,7 +142,7 @@ class _ConstructionPage extends StatelessWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.construction_rounded, color: scheme.primary, size: 20),
+                          Icon(Icons.check_circle_outline_rounded, color: scheme.primary, size: 20),
                           const SizedBox(width: 10),
                           Expanded(child: Text(item)),
                         ],
