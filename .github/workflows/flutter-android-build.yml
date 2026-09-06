@@ -1,0 +1,46 @@
+name: Flutter Android build
+
+on:
+  push:
+    branches: [flutter-migration]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.1'
+          channel: stable
+
+      - name: Prepare verified offline Quran assets
+        run: bash tool/prepare_quran_assets.sh
+
+      - name: Configure Android platform
+        run: flutter create . --platforms android
+
+      - name: Prepare Miqra Android branding
+        run: python3 tool/prepare_android_branding.py
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: miqra-release-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
