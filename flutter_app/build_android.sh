@@ -2,10 +2,11 @@
 set -euo pipefail
 
 flutter create . --platforms android
+bash tool/prepare_quran_assets.sh
 python3 tool/prepare_android_branding.py
 flutter pub get
 flutter clean
 flutter build apk --release
 
-echo "Nuur Path APK built with the custom launcher icon."
+echo "Miqra APK built with bundled offline Quran data."
 echo "Output: build/app/outputs/flutter-apk/app-release.apk"
