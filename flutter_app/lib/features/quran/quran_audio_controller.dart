@@ -305,9 +305,7 @@ class QuranAudioController extends ChangeNotifier {
         _recovering = false;
       }
 
-      // IMPORTANT: clear the recovery lock before advancing. The previous
-      // implementation called _advance while _recovering was still true,
-      // causing the queue to get stuck on one ayah forever.
+      // Clear the recovery lock before advancing so the queue cannot deadlock.
       if (!played && token == _playToken && !_stopped && index == _queueIndex) {
         await _advance();
       }
@@ -326,7 +324,8 @@ class QuranAudioController extends ChangeNotifier {
       final state = _player.processingState;
       final stalledFor = DateTime.now().difference(_lastProgressAt);
       final isActuallyStalled =
-          state == ProcessingState.buffering || state == ProcessingState.loading ||
+          state == ProcessingState.buffering ||
+          state == ProcessingState.loading ||
           (state == ProcessingState.ready && _player.playing && stalledFor > const Duration(seconds: 18));
       if (isActuallyStalled) {
         timer.cancel();
