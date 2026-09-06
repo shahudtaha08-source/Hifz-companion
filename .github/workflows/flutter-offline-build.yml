@@ -1,0 +1,28 @@
+name: Flutter offline build
+
+on:
+  push:
+    branches: [flutter-migration]
+  pull_request:
+    branches: [flutter-migration]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.1'
+          channel: stable
+      - name: Prepare verified offline Quran assets
+        run: bash tool/prepare_quran_assets.sh
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Build web
+        run: flutter build web --release
