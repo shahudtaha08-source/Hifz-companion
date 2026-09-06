@@ -87,7 +87,7 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               DropdownButtonFormField<int>(
-                                value: _surahNumber,
+                                initialValue: _surahNumber,
                                 isExpanded: true,
                                 decoration: const InputDecoration(labelText: 'Surah'),
                                 items: List.generate(114, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}. ${_surahNames[i]}'))),
@@ -95,7 +95,7 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<Reciter>(
-                                value: _audio.reciter,
+                                initialValue: _audio.reciter,
                                 isExpanded: true,
                                 decoration: const InputDecoration(labelText: 'Reciter'),
                                 items: reciters.map((r) => DropdownMenuItem(value: r, child: Text(r.name))).toList(),
