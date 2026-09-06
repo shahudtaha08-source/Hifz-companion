@@ -22,6 +22,8 @@ jobs:
         run: bash tool/prepare_quran_assets.sh
       - name: Install dependencies
         run: flutter pub get
+      - name: Configure web platform
+        run: flutter create . --platforms web
       - name: Analyze
         run: flutter analyze
       - name: Build web
