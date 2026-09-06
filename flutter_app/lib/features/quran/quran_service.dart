@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 
 class AyahData {
   const AyahData({
@@ -36,60 +36,99 @@ class SurahData {
   final List<AyahData> ayahs;
 }
 
+/// Local Quran repository.
+///
+/// All four datasets are bundled into the Flutter build. No HTTP request is
+/// made when reading the Quran, opening a Surah, showing the daily ayah, or
+/// building the Mutashabihat corpus. The build script verifies 114 Surahs and
+/// 6,236 ayahs in every source before the assets are accepted.
 class QuranService {
-  static const _host = 'https://api.alquran.cloud/v1';
   static final Map<int, SurahData> _surahCache = {};
+  static Future<void>? _loadFuture;
+  static List<AyahData>? _allAyahs;
 
-  // Uses package:http instead of dart:io HttpClient so the same code works on
-  // Flutter Web, Android, iOS and desktop.
-  static Future<dynamic> _get(String path) async {
-    final response = await http.get(Uri.parse('$_host$path'));
-    if (response.statusCode != 200) {
-      throw Exception('Quran data request failed: ${response.statusCode}');
+  static Future<void> _ensureLoaded() {
+    return _loadFuture ??= _loadLocalDatasets();
+  }
+
+  static Future<void> _loadLocalDatasets() async {
+    final arabic = await _readList('assets/quran/quran.json');
+    final english = await _readList('assets/quran/quran_en.json');
+    final urdu = await _readList('assets/quran/quran_ur.json');
+    final transliteration = await _readList('assets/quran/quran_transliteration.json');
+
+    if (arabic.length != 114 || english.length != 114 || urdu.length != 114 || transliteration.length != 114) {
+      throw StateError('Bundled Quran data is incomplete: expected 114 Surahs in every dataset.');
     }
 
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    if (decoded['code'] != 200) {
-      throw Exception('Quran data is unavailable');
+    final all = <AyahData>[];
+    for (var s = 0; s < 114; s++) {
+      final aChapter = arabic[s] as Map<String, dynamic>;
+      final eChapter = english[s] as Map<String, dynamic>;
+      final uChapter = urdu[s] as Map<String, dynamic>;
+      final tChapter = transliteration[s] as Map<String, dynamic>;
+      final aVerses = (aChapter['verses'] as List).cast<Map<String, dynamic>>();
+      final eVerses = (eChapter['verses'] as List).cast<Map<String, dynamic>>();
+      final uVerses = (uChapter['verses'] as List).cast<Map<String, dynamic>>();
+      final tVerses = (tChapter['verses'] as List).cast<Map<String, dynamic>>();
+      if (aVerses.length != eVerses.length || aVerses.length != uVerses.length || aVerses.length != tVerses.length) {
+        throw StateError('Bundled Quran dataset mismatch in Surah ${s + 1}.');
+      }
+
+      final surahNumber = (aChapter['id'] as num).toInt();
+      for (var i = 0; i < aVerses.length; i++) {
+        final verse = aVerses[i];
+        final e = eVerses[i];
+        final u = uVerses[i];
+        final t = tVerses[i];
+        final ayahNumber = (verse['id'] as num).toInt();
+        all.add(AyahData(
+          number: all.length + 1,
+          surah: surahNumber,
+          ayah: ayahNumber,
+          arabic: verse['text'] as String,
+          english: _translationText(e),
+          urdu: _translationText(u),
+          transliteration: _translationText(t),
+        ));
+      }
     }
-    return decoded['data'];
+
+    if (all.length != 6236) {
+      throw StateError('Bundled Quran data is incomplete: expected 6,236 ayahs, got ${all.length}.');
+    }
+    _allAyahs = all;
+  }
+
+  static Future<List<dynamic>> _readList(String path) async {
+    final raw = await rootBundle.loadString(path);
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) throw StateError('Invalid Quran asset: $path');
+    return decoded;
+  }
+
+  static String _translationText(Map<String, dynamic> verse) {
+    final value = verse['translation'] ?? verse['text'];
+    if (value is! String) throw StateError('Invalid translation verse payload.');
+    return value;
   }
 
   static Future<SurahData> loadSurah(int number) async {
+    if (number < 1 || number > 114) throw ArgumentError.value(number, 'number');
+    await _ensureLoaded();
     final cached = _surahCache[number];
     if (cached != null) return cached;
 
-    final raw = await _get(
-      '/surah/$number/editions/quran-uthmani,en.sahih,ur.jalandhry,en.transliteration',
-    ) as List<dynamic>;
-    final editions = raw.cast<Map<String, dynamic>>();
-    final arabic = editions[0];
-    final english = editions[1];
-    final urdu = editions[2];
-    final transliteration = editions[3];
+    final all = _allAyahs!;
+    final ayahs = all.where((a) => a.surah == number).toList(growable: false);
+    if (ayahs.isEmpty) throw StateError('Surah $number was not found in the bundled Quran.');
 
-    final arabicAyahs = (arabic['ayahs'] as List).cast<Map<String, dynamic>>();
-    final englishAyahs = (english['ayahs'] as List).cast<Map<String, dynamic>>();
-    final urduAyahs = (urdu['ayahs'] as List).cast<Map<String, dynamic>>();
-    final translitAyahs = (transliteration['ayahs'] as List).cast<Map<String, dynamic>>();
-
-    final ayahs = List.generate(arabicAyahs.length, (i) {
-      final a = arabicAyahs[i];
-      return AyahData(
-        number: a['number'] as int,
-        surah: number,
-        ayah: a['numberInSurah'] as int,
-        arabic: a['text'] as String,
-        english: englishAyahs[i]['text'] as String,
-        urdu: urduAyahs[i]['text'] as String,
-        transliteration: translitAyahs[i]['text'] as String,
-      );
-    });
-
+    final raw = await _readList('assets/quran/quran.json');
+    final chapter = raw.firstWhere((item) => (item as Map<String, dynamic>)['id'] == number) as Map<String, dynamic>;
     final result = SurahData(
       number: number,
-      name: arabic['name'] as String,
-      englishName: arabic['englishName'] as String,
+      name: chapter['name'] as String,
+      englishName: chapter['transliteration'] as String,
       ayahs: ayahs,
     );
     _surahCache[number] = result;
@@ -97,20 +136,15 @@ class QuranService {
   }
 
   static Future<AyahData> loadAyah(int globalNumber) async {
-    final raw = await _get(
-      '/ayah/$globalNumber/editions/quran-uthmani,en.sahih,ur.jalandhry,en.transliteration',
-    ) as List<dynamic>;
-    final editions = raw.cast<Map<String, dynamic>>();
-    final a = editions[0] as Map<String, dynamic>;
+    await _ensureLoaded();
+    if (globalNumber < 1 || globalNumber > _allAyahs!.length) {
+      throw ArgumentError.value(globalNumber, 'globalNumber');
+    }
+    return _allAyahs![globalNumber - 1];
+  }
 
-    return AyahData(
-      number: a['number'] as int,
-      surah: (a['surah'] as Map<String, dynamic>)['number'] as int,
-      ayah: a['numberInSurah'] as int,
-      arabic: a['text'] as String,
-      english: (editions[1] as Map<String, dynamic>)['text'] as String,
-      urdu: (editions[2] as Map<String, dynamic>)['text'] as String,
-      transliteration: (editions[3] as Map<String, dynamic>)['text'] as String,
-    );
+  static Future<List<AyahData>> loadAllAyahs() async {
+    await _ensureLoaded();
+    return List.unmodifiable(_allAyahs!);
   }
 }
