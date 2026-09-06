@@ -36,7 +36,9 @@ class MutashabihatService {
     Future<void> worker() async {
       while (true) {
         final surahNumber = next++;
-        if (surahNumber > total) return;
+        if (surahNumber > total) {
+          return;
+        }
         final surah = await QuranService.loadSurah(surahNumber);
         all.addAll(surah.ayahs);
         onProgress?.call(all.length, 6236);
@@ -87,7 +89,14 @@ class MutashabihatService {
       if (target.number == source.number) continue;
       final result = _compare(sourceWords, _words(target.arabic));
       if (result.$1 < 35 || result.$2.split(' ').length < 3) continue;
-      matches.add(MutashabihatMatch(source: source, target: target, score: result.$1, shared: result.$2));
+      matches.add(
+        MutashabihatMatch(
+          source: source,
+          target: target,
+          score: result.$1,
+          shared: result.$2,
+        ),
+      );
     }
     matches.sort((a, b) => b.score.compareTo(a.score));
     return matches.take(limit).toList();
@@ -95,7 +104,9 @@ class MutashabihatService {
 
   static (int, String) _compare(List<String> a, List<String> b) {
     final positions = <String, int>{};
-    for (var i = 0; i < b.length; i++) positions.putIfAbsent(b[i], () => i);
+    for (var i = 0; i < b.length; i++) {
+      positions.putIfAbsent(b[i], () => i);
+    }
     var bestLength = 0;
     var bestPhrase = '';
     for (var i = 0; i < a.length; i++) {
