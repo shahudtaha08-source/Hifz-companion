@@ -19,10 +19,8 @@ DENSITIES = {
 for folder in (DRAWABLE, MIPMAP_ANY, MIPMAP_V26, *(RES / d for d in DENSITIES)):
     folder.mkdir(parents=True, exist_ok=True)
 
-# Use a UNIQUE resource name instead of Flutter's default ic_launcher. This
-# prevents Android/launcher caches from resolving the old generated Flutter icon.
-ICON_NAME = "nuur_path_launcher"
-ROUND_ICON_NAME = "nuur_path_launcher_round"
+ICON_NAME = "miqra_launcher"
+ROUND_ICON_NAME = "miqra_launcher_round"
 
 def png_rgba(path, width, height, pixels):
     raw = bytearray()
@@ -114,13 +112,12 @@ ICON = '''<?xml version="1.0" encoding="utf-8"?>
     <path android:fillColor="#F3C46D" android:pathData="M385,87C351,92 324,121 324,157C324,194 354,224 391,224C415,224 437,211 450,191C438,198 425,202 411,202C373,202 343,171 343,133C343,114 351,97 364,85C371,79 379,74 385,72V87Z"/>
 </vector>
 '''
-(DRAWABLE / "nuur_path_icon.xml").write_text(ICON, encoding="utf-8")
+(DRAWABLE / "miqra_icon.xml").write_text(ICON, encoding="utf-8")
 
-# Android 7 and lower use the real PNGs. Android 8+ gets a unique adaptive icon.
 ADAPTIVE = '''<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@android:color/transparent"/>
-    <foreground android:drawable="@drawable/nuur_path_icon"/>
+    <foreground android:drawable="@drawable/miqra_icon"/>
 </adaptive-icon>
 '''
 for name in (ICON_NAME, ROUND_ICON_NAME):
@@ -132,9 +129,9 @@ if not manifest.exists():
 text = manifest.read_text(encoding="utf-8")
 text = re.sub(r'android:icon="[^"]*"', f'android:icon="@mipmap/{ICON_NAME}"', text)
 text = re.sub(r'android:roundIcon="[^"]*"', f'android:roundIcon="@mipmap/{ROUND_ICON_NAME}"', text)
-text = re.sub(r'android:label="[^"]*"', 'android:label="Nuur Path"', text)
+text = re.sub(r'android:label="[^"]*"', 'android:label="Miqra"', text)
 if 'android:roundIcon=' not in text:
     text = text.replace(f'android:icon="@mipmap/{ICON_NAME}"', f'android:icon="@mipmap/{ICON_NAME}" android:roundIcon="@mipmap/{ROUND_ICON_NAME}"')
 manifest.write_text(text, encoding="utf-8")
 
-print("Wrote uniquely named Nuur Path launcher resources and forced the Android manifest to use them.")
+print("Wrote Miqra launcher resources and forced the Android manifest to use them.")
