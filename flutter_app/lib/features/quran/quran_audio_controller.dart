@@ -3,33 +3,20 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
+import 'audio_pack_service.dart';
 import 'quran_service.dart';
 
 class Reciter {
-  const Reciter({
-    required this.id,
-    required this.name,
-    required this.edition,
-    this.everyAyahFolder,
-    this.alternateEveryAyahFolders = const [],
-    this.urdu = false,
-  });
-
+  const Reciter({required this.id, required this.name, required this.edition, this.everyAyahFolder, this.alternateEveryAyahFolders = const [], this.urdu = false});
   final String id;
   final String name;
   final String edition;
   final String? everyAyahFolder;
   final List<String> alternateEveryAyahFolders;
   final bool urdu;
-
-  String cdnUrlFor(AyahData ayah) =>
-      'https://cdn.islamic.network/quran/audio/128/$edition/${ayah.number}.mp3';
-
+  String cdnUrlFor(AyahData ayah) => 'https://cdn.islamic.network/quran/audio/128/$edition/${ayah.number}.mp3';
   List<String> everyAyahUrlsFor(AyahData ayah) {
-    final folders = <String>[
-      if (everyAyahFolder != null) everyAyahFolder!,
-      ...alternateEveryAyahFolders,
-    ];
+    final folders = <String>[if (everyAyahFolder != null) everyAyahFolder!, ...alternateEveryAyahFolders];
     final s = ayah.surah.toString().padLeft(3, '0');
     final a = ayah.ayah.toString().padLeft(3, '0');
     final file = '$s$a.mp3';
@@ -53,45 +40,20 @@ const reciters = <Reciter>[
   Reciter(id: 'ghamdi', name: 'Saad Al-Ghamdi', edition: 'ar.saadalghamdi', everyAyahFolder: 'Ghamadi_40kbps'),
   Reciter(id: 'ajmy', name: 'Ahmed Al-Ajmi', edition: 'ar.ahmedajamy', everyAyahFolder: 'Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net'),
   Reciter(id: 'shamshad', name: 'Shamshad Ali Khan (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_shamshad_ali_khan_46kbps', urdu: true),
-  Reciter(
-    id: 'fateh-jalandhari',
-    name: 'Fateh Muhammad Jalandhari (Urdu)',
-    edition: 'ur.jalandhry',
-    everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps',
-    alternateEveryAyahFolders: [
-      'translations/urdu_fateh_muhammad_jalandhari_46kbps',
-      'translations/urdu_fateh_muhammad_jalandhary_46kbps',
-      'translations/urdu_fateh_muhammad_jalandhry_46kbps',
-    ],
-    urdu: true,
-  ),
+  Reciter(id: 'fateh-jalandhari', name: 'Fateh Muhammad Jalandhari (Urdu)', edition: 'ur.jalandhry', everyAyahFolder: 'translations/urdu_fateh_muhammad_jalandhri_46kbps', alternateEveryAyahFolders: ['translations/urdu_fateh_muhammad_jalandhari_46kbps','translations/urdu_fateh_muhammad_jalandhary_46kbps','translations/urdu_fateh_muhammad_jalandhry_46kbps'], urdu: true),
 ];
 
-class _QueueItem {
-  const _QueueItem(this.ayah, this.reciter);
-  final AyahData ayah;
-  final Reciter reciter;
-}
+class _QueueItem { const _QueueItem(this.ayah, this.reciter); final AyahData ayah; final Reciter reciter; }
 
 class QuranAudioController extends ChangeNotifier {
   QuranAudioController() {
     _stateSub = _player.playerStateStream.listen((state) {
-      if (state.playing && state.processingState == ProcessingState.ready) {
-        _loading = false;
-        _markProgress();
-      }
-      if (state.processingState == ProcessingState.completed) {
-        _advance();
-      }
+      if (state.playing && state.processingState == ProcessingState.ready) { _loading = false; _markProgress(); }
+      if (state.processingState == ProcessingState.completed) _advance();
       notifyListeners();
     });
-    _positionSub = _player.positionStream.listen((position) {
-      if (position > Duration.zero) _markProgress();
-    });
-    _errorSub = _player.playbackEventStream.listen(
-      (_) {},
-      onError: (Object error, StackTrace stackTrace) => _recoverFromSourceFailure(error),
-    );
+    _positionSub = _player.positionStream.listen((position) { if (position > Duration.zero) _markProgress(); });
+    _errorSub = _player.playbackEventStream.listen((_) {}, onError: (Object error, StackTrace stackTrace) => _recoverFromSourceFailure(error));
   }
 
   final AudioPlayer _player = AudioPlayer();
@@ -99,7 +61,6 @@ class QuranAudioController extends ChangeNotifier {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<PlaybackEvent>? _errorSub;
   final ValueNotifier<AyahData?> currentAyah = ValueNotifier(null);
-
   List<_QueueItem> _queue = [];
   int _queueIndex = -1;
   int _repeat = 1;
@@ -128,21 +89,9 @@ class QuranAudioController extends ChangeNotifier {
   int get round => _round;
   String? get errorMessage => _errorMessage;
 
-  void setReciter(Reciter value) {
-    _reciter = value;
-    _errorMessage = null;
-    notifyListeners();
-  }
-
-  void setRepeat(int value) {
-    _repeat = value.clamp(1, 51).toInt();
-    notifyListeners();
-  }
-
-  void setArabicThenUrdu(bool value) {
-    _arabicThenUrdu = value;
-    notifyListeners();
-  }
+  void setReciter(Reciter value) { _reciter = value; _errorMessage = null; notifyListeners(); }
+  void setRepeat(int value) { _repeat = value.clamp(1, 51).toInt(); notifyListeners(); }
+  void setArabicThenUrdu(bool value) { _arabicThenUrdu = value; notifyListeners(); }
 
   Future<void> playAyahs(List<AyahData> ayahs, {int start = 0}) async {
     if (ayahs.isEmpty || start < 0 || start >= ayahs.length) return;
@@ -155,7 +104,6 @@ class QuranAudioController extends ChangeNotifier {
     _round = 1;
     _errorMessage = null;
     _stopped = false;
-
     final selected = _reciter;
     final urdu = reciters.firstWhere((r) => r.id == 'fateh-jalandhari');
     final selectedAyahs = ayahs.sublist(start);
@@ -169,66 +117,21 @@ class QuranAudioController extends ChangeNotifier {
   }
 
   Future<void> playSingle(AyahData ayah) => playAyahs([ayah]);
-
-  Future<void> pause() async {
-    if (_stopped || _loading) return;
-    _cancelBufferWatchdog();
-    await _player.pause();
-    notifyListeners();
-  }
-
-  Future<void> resume() async {
-    if (_stopped || _queueIndex < 0) return;
-    _errorMessage = null;
-    _loading = false;
-    await _player.play();
-    _markProgress();
-    _startBufferWatchdog(_playToken, _queueIndex, _sourceIndex);
-    notifyListeners();
-  }
-
-  Future<void> stop() async {
-    ++_playToken;
-    _cancelBufferWatchdog();
-    _stopped = true;
-    _loading = false;
-    _queueIndex = -1;
-    _queue = [];
-    _activeSources = const [];
-    _sourceIndex = -1;
-    _round = 1;
-    _errorMessage = null;
-    currentAyah.value = null;
-    await _player.stop();
-    notifyListeners();
-  }
+  Future<void> pause() async { if (_stopped || _loading) return; _cancelBufferWatchdog(); await _player.pause(); notifyListeners(); }
+  Future<void> resume() async { if (_stopped || _queueIndex < 0) return; _errorMessage = null; _loading = false; await _player.play(); _markProgress(); _startBufferWatchdog(_playToken, _queueIndex, _sourceIndex); notifyListeners(); }
+  Future<void> stop() async { ++_playToken; _cancelBufferWatchdog(); _stopped = true; _loading = false; _queueIndex = -1; _queue = []; _activeSources = const []; _sourceIndex = -1; _round = 1; _errorMessage = null; currentAyah.value = null; await _player.stop(); notifyListeners(); }
 
   Future<void> _advance() async {
     if (_advancing || _stopped || _queueIndex < 0) return;
     _advancing = true;
     try {
       final next = _queueIndex + 1;
-      if (next >= _queue.length) {
-        _finishSequence();
-        return;
-      }
+      if (next >= _queue.length) { _finishSequence(); return; }
       await _playIndex(next, token: _playToken);
-    } finally {
-      _advancing = false;
-    }
+    } finally { _advancing = false; }
   }
 
-  void _finishSequence() {
-    _cancelBufferWatchdog();
-    _stopped = true;
-    _loading = false;
-    _queueIndex = -1;
-    _activeSources = const [];
-    _sourceIndex = -1;
-    currentAyah.value = null;
-    notifyListeners();
-    onSequenceComplete?.call();
-  }
+  void _finishSequence() { _cancelBufferWatchdog(); _stopped = true; _loading = false; _queueIndex = -1; _activeSources = const []; _sourceIndex = -1; currentAyah.value = null; notifyListeners(); onSequenceComplete?.call(); }
 
   Future<void> _playIndex(int index, {required int token}) async {
     if (_stopped || index < 0 || index >= _queue.length || token != _playToken) return;
@@ -239,14 +142,12 @@ class QuranAudioController extends ChangeNotifier {
     _sourceIndex = -1;
     final item = _queue[index];
     currentAyah.value = item.ayah;
-
-    // Put the Islamic Network CDN first for every reciter, then fall back to
-    // both EveryAyah hostnames. This avoids depending on a single host.
-    _activeSources = <String>[
-      item.reciter.cdnUrlFor(item.ayah),
-      ...item.reciter.everyAyahUrlsFor(item.ayah),
-    ].toSet().toList();
-
+    final local = await AudioPackService.localPath(item.reciter.id, item.ayah.surah, item.ayah.ayah);
+    if (local != null && token == _playToken && !_stopped) {
+      _activeSources = [local];
+    } else {
+      _activeSources = <String>[item.reciter.cdnUrlFor(item.ayah), ...item.reciter.everyAyahUrlsFor(item.ayah)].toSet().toList();
+    }
     await _tryCurrentAyahSource(token, startAt: 0);
   }
 
@@ -261,7 +162,11 @@ class QuranAudioController extends ChangeNotifier {
       try {
         await _player.stop();
         if (token != _playToken || _stopped) return false;
-        await _player.setUrl(_activeSources[i]).timeout(const Duration(seconds: 15));
+        if (_activeSources.length == 1 && !_activeSources[i].startsWith('http')) {
+          await _player.setFilePath(_activeSources[i]).timeout(const Duration(seconds: 15));
+        } else {
+          await _player.setUrl(_activeSources[i]).timeout(const Duration(seconds: 15));
+        }
         if (token != _playToken || _stopped) return false;
         _round = _roundFor(_queueIndex);
         _loading = false;
@@ -275,7 +180,6 @@ class QuranAudioController extends ChangeNotifier {
         debugPrint('Audio source failed: ${_activeSources[i]} :: $error');
       }
     }
-
     if (token != _playToken || _stopped) return false;
     _loading = false;
     _errorMessage = 'Audio is temporarily unavailable. Retrying the next ayah…';
@@ -293,66 +197,29 @@ class QuranAudioController extends ChangeNotifier {
     _loading = true;
     _errorMessage = 'Connection interrupted. Switching audio source…';
     notifyListeners();
-
     Future<void>(() async {
       var played = false;
       try {
         if (token != _playToken || _stopped || index != _queueIndex) return;
         played = await _tryCurrentAyahSource(token, startAt: _sourceIndex + 1);
-      } catch (e) {
-        debugPrint('Audio recovery failed: $e');
-      } finally {
-        _recovering = false;
-      }
-
-      // Clear the recovery lock before advancing so the queue cannot deadlock.
-      if (!played && token == _playToken && !_stopped && index == _queueIndex) {
-        await _advance();
-      }
+      } catch (e) { debugPrint('Audio recovery failed: $e'); }
+      finally { _recovering = false; }
+      if (!played && token == _playToken && !_stopped && index == _queueIndex) await _advance();
     });
   }
 
   void _markProgress() => _lastProgressAt = DateTime.now();
-
   void _startBufferWatchdog(int token, int queueIndex, int sourceIndex) {
     _cancelBufferWatchdog();
     _bufferWatchdog = Timer.periodic(const Duration(seconds: 8), (timer) {
-      if (token != _playToken || _stopped || queueIndex != _queueIndex || sourceIndex != _sourceIndex) {
-        timer.cancel();
-        return;
-      }
+      if (token != _playToken || _stopped || queueIndex != _queueIndex || sourceIndex != _sourceIndex) { timer.cancel(); return; }
       final state = _player.processingState;
       final stalledFor = DateTime.now().difference(_lastProgressAt);
-      final isActuallyStalled =
-          state == ProcessingState.buffering ||
-          state == ProcessingState.loading ||
-          (state == ProcessingState.ready && _player.playing && stalledFor > const Duration(seconds: 18));
-      if (isActuallyStalled) {
-        timer.cancel();
-        _recoverFromSourceFailure(TimeoutException('Audio source stalled'));
-      }
+      final isActuallyStalled = state == ProcessingState.buffering || state == ProcessingState.loading || (state == ProcessingState.ready && _player.playing && stalledFor > const Duration(seconds: 18));
+      if (isActuallyStalled) { timer.cancel(); _recoverFromSourceFailure(TimeoutException('Audio source stalled')); }
     });
   }
-
-  void _cancelBufferWatchdog() {
-    _bufferWatchdog?.cancel();
-    _bufferWatchdog = null;
-  }
-
-  int _roundFor(int index) {
-    final perRound = _queue.isEmpty ? 1 : _queue.length ~/ _repeat;
-    return perRound == 0 ? 1 : (index ~/ perRound) + 1;
-  }
-
-  @override
-  void dispose() {
-    ++_playToken;
-    _cancelBufferWatchdog();
-    _stateSub?.cancel();
-    _positionSub?.cancel();
-    _errorSub?.cancel();
-    currentAyah.dispose();
-    _player.dispose();
-    super.dispose();
-  }
+  void _cancelBufferWatchdog() { _bufferWatchdog?.cancel(); _bufferWatchdog = null; }
+  int _roundFor(int index) { final perRound = _queue.isEmpty ? 1 : _queue.length ~/ _repeat; return perRound == 0 ? 1 : (index ~/ perRound) + 1; }
+  @override void dispose() { ++_playToken; _cancelBufferWatchdog(); _stateSub?.cancel(); _positionSub?.cancel(); _errorSub?.cancel(); currentAyah.dispose(); _player.dispose(); super.dispose(); }
 }
