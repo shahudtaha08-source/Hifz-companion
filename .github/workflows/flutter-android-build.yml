@@ -25,6 +25,9 @@ jobs:
       - name: Configure Android platform
         run: flutter create . --platforms android
 
+      - name: Apply Miqra Android branding
+        run: python3 tool/prepare_android_branding.py
+
       - name: Install dependencies
         run: flutter pub get
 
