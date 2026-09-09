@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ayah_hifz_page.dart';
+
 class HifzPage extends StatefulWidget {
   const HifzPage({super.key});
   @override
@@ -48,9 +50,27 @@ class _HifzPageState extends State<HifzPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('My Hifz', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                const Text('Track memorized, learning and revision status locally.'),
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('My Hifz', style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    const Text('Track Surahs and open any Surah for ayah-level revision.'),
+                  ])),
+                  IconButton.filledTonal(
+                    tooltip: 'Continue Hifz',
+                    onPressed: () async {
+                      final p = await SharedPreferences.getInstance();
+                      final n = p.getInt('hifz_last_surah');
+                      if (!context.mounted) return;
+                      if (n == null || n < 1 || n > 114) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No Hifz session saved yet. Open a Surah to begin.')));
+                        return;
+                      }
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => AyahHifzPage(surahNumber: n, surahName: names[n - 1])));
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded),
+                  ),
+                ]),
                 const SizedBox(height: 18),
                 Card(
                   child: Padding(
@@ -80,6 +100,7 @@ class _HifzPageState extends State<HifzPage> {
                       leading: CircleAvatar(child: Text('$n')),
                       title: Text(names[i], style: const TextStyle(fontWeight: FontWeight.w700)),
                       subtitle: Text(s),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AyahHifzPage(surahNumber: n, surahName: names[i]))),
                       trailing: PopupMenuButton<String>(
                         initialValue: s,
                         onSelected: (v) => setStatus(n, v),
