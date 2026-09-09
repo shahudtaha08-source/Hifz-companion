@@ -35,6 +35,20 @@ class _HifzPageState extends State<HifzPage> {
     await p.setString('hifz_surah_$n', value);
   }
 
+  Future<void> _continueHifz() async {
+    final p = await SharedPreferences.getInstance();
+    final n = p.getInt('hifz_last_surah');
+    final ayah = p.getInt('hifz_last_ayah');
+    if (!mounted) return;
+    if (n == null || n < 1 || n > 114) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No Hifz session saved yet. Open a Surah to begin.')));
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AyahHifzPage(surahNumber: n, surahName: names[n - 1], initialAyah: ayah),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!loaded) return const Center(child: CircularProgressIndicator());
@@ -58,16 +72,7 @@ class _HifzPageState extends State<HifzPage> {
                   ])),
                   IconButton.filledTonal(
                     tooltip: 'Continue Hifz',
-                    onPressed: () async {
-                      final p = await SharedPreferences.getInstance();
-                      final n = p.getInt('hifz_last_surah');
-                      if (!context.mounted) return;
-                      if (n == null || n < 1 || n > 114) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No Hifz session saved yet. Open a Surah to begin.')));
-                        return;
-                      }
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => AyahHifzPage(surahNumber: n, surahName: names[n - 1])));
-                    },
+                    onPressed: _continueHifz,
                     icon: const Icon(Icons.play_arrow_rounded),
                   ),
                 ]),
