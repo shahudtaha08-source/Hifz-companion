@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'audio_pack_button.dart';
 import 'quran_audio_controller.dart';
 import 'quran_service.dart';
 
@@ -9,9 +10,7 @@ const _surahNames = <String>[
 
 class QuranReaderPage extends StatefulWidget {
   const QuranReaderPage({super.key});
-
-  @override
-  State<QuranReaderPage> createState() => _QuranReaderPageState();
+  @override State<QuranReaderPage> createState() => _QuranReaderPageState();
 }
 
 class _QuranReaderPageState extends State<QuranReaderPage> {
@@ -33,10 +32,7 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
   Future<void> _changeSurah(int number) async {
     await _audio.stop();
     if (!mounted) return;
-    setState(() {
-      _surahNumber = number;
-      _surah = QuranService.loadSurah(number);
-    });
+    setState(() { _surahNumber = number; _surah = QuranService.loadSurah(number); });
   }
 
   Future<void> _playNextSurah() async {
@@ -44,18 +40,12 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
     final next = _surahNumber + 1;
     final data = await QuranService.loadSurah(next);
     if (!mounted) return;
-    setState(() {
-      _surahNumber = next;
-      _surah = Future.value(data);
-    });
+    setState(() { _surahNumber = next; _surah = Future.value(data); });
     await _audio.playAyahs(data.ayahs);
   }
 
   @override
-  void dispose() {
-    _audio.dispose();
-    super.dispose();
-  }
+  void dispose() { _audio.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +91,10 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
                                 items: reciters.map((r) => DropdownMenuItem(value: r, child: Text(r.name))).toList(),
                                 onChanged: (v) { if (v != null) _audio.setReciter(v); },
                               ),
+                              if (data != null) ...[
+                                const SizedBox(height: 10),
+                                AudioPackButton(reciter: _audio.reciter, surah: data),
+                              ],
                               const SizedBox(height: 8),
                               SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
@@ -119,62 +113,26 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
                               const SizedBox(height: 4),
                               Text('Repetitions', style: theme.textTheme.labelLarge),
                               const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [1, 2, 3, 5, 7, 11, 21, 31, 51].map((n) => ChoiceChip(
-                                  label: Text('×$n'),
-                                  selected: _audio.repeat == n,
-                                  onSelected: (_) => _audio.setRepeat(n),
-                                )).toList(),
-                              ),
+                              Wrap(spacing: 8, runSpacing: 8, children: [1, 2, 3, 5, 7, 11, 21, 31, 51].map((n) => ChoiceChip(label: Text('×$n'), selected: _audio.repeat == n, onSelected: (_) => _audio.setRepeat(n))).toList()),
                               const SizedBox(height: 18),
                               if (data != null)
                                 Wrap(
                                   spacing: 10,
                                   runSpacing: 10,
                                   children: [
-                                    FilledButton.icon(
-                                      onPressed: _audio.isLoading ? null : () async => _audio.playAyahs(data.ayahs),
-                                      icon: _audio.isLoading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow_rounded),
-                                      label: Text(_audio.isLoading ? 'Loading audio…' : 'Play Surah'),
-                                    ),
-                                    OutlinedButton.icon(
-                                      onPressed: _audio.hasActiveQueue && !_audio.isLoading ? () async => _audio.pause() : null,
-                                      icon: const Icon(Icons.pause_rounded),
-                                      label: const Text('Pause'),
-                                    ),
-                                    OutlinedButton.icon(
-                                      onPressed: _audio.isPaused && !_audio.isLoading ? () async => _audio.resume() : null,
-                                      icon: const Icon(Icons.play_arrow_rounded),
-                                      label: const Text('Resume'),
-                                    ),
-                                    OutlinedButton.icon(
-                                      onPressed: _audio.hasActiveQueue || _audio.isLoading ? () async => _audio.stop() : null,
-                                      icon: const Icon(Icons.stop_rounded),
-                                      label: const Text('Stop'),
-                                    ),
+                                    FilledButton.icon(onPressed: _audio.isLoading ? null : () async => _audio.playAyahs(data.ayahs), icon: _audio.isLoading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow_rounded), label: Text(_audio.isLoading ? 'Loading audio…' : 'Play Surah')),
+                                    OutlinedButton.icon(onPressed: _audio.hasActiveQueue && !_audio.isLoading ? () async => _audio.pause() : null, icon: const Icon(Icons.pause_rounded), label: const Text('Pause')),
+                                    OutlinedButton.icon(onPressed: _audio.isPaused && !_audio.isLoading ? () async => _audio.resume() : null, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Resume')),
+                                    OutlinedButton.icon(onPressed: _audio.hasActiveQueue || _audio.isLoading ? () async => _audio.stop() : null, icon: const Icon(Icons.stop_rounded), label: const Text('Stop')),
                                   ],
                                 ),
                               if (_audio.currentAyah.value != null) ...[
                                 const SizedBox(height: 14),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(12)),
-                                  child: Row(children: [
-                                    Icon(_audio.isPlaying ? Icons.volume_up_rounded : Icons.pause_circle_outline_rounded, color: scheme.onPrimaryContainer),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: Text('Ayah ${_audio.currentAyah.value!.surah}:${_audio.currentAyah.value!.ayah} • Round ${_audio.round}/${_audio.repeat}', style: TextStyle(fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer))),
-                                  ]),
-                                ),
+                                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(12)), child: Row(children: [Icon(_audio.isPlaying ? Icons.volume_up_rounded : Icons.pause_circle_outline_rounded, color: scheme.onPrimaryContainer), const SizedBox(width: 10), Expanded(child: Text('Ayah ${_audio.currentAyah.value!.surah}:${_audio.currentAyah.value!.ayah} • Round ${_audio.round}/${_audio.repeat}', style: TextStyle(fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer)))])),
                               ],
                               if (_audio.errorMessage != null) ...[
                                 const SizedBox(height: 12),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(color: scheme.errorContainer, borderRadius: BorderRadius.circular(12)),
-                                  child: Text(_audio.errorMessage!, style: TextStyle(color: scheme.onErrorContainer)),
-                                ),
+                                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: scheme.errorContainer, borderRadius: BorderRadius.circular(12)), child: Text(_audio.errorMessage!, style: TextStyle(color: scheme.onErrorContainer))),
                               ],
                             ],
                           ),
@@ -184,22 +142,11 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
                       if (snapshot.connectionState == ConnectionState.waiting)
                         const Center(child: Padding(padding: EdgeInsets.all(48), child: CircularProgressIndicator()))
                       else if (snapshot.hasError)
-                        Card(child: Padding(padding: const EdgeInsets.all(20), child: Text('Could not load Quran data right now. Please check the connection and try again.\n${snapshot.error}')))
+                        Card(child: Padding(padding: const EdgeInsets.all(20), child: Text('Could not load Quran data right now.\n${snapshot.error}')))
                       else if (data != null) ...[
-                        Row(children: [
-                          Expanded(child: Text('${data.number}. ${data.englishName}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
-                          Text(data.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                        ]),
+                        Row(children: [Expanded(child: Text('${data.number}. ${data.englishName}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))), Text(data.name, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))]),
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            FilterChip(label: const Text('English'), selected: _showEnglish, onSelected: (v) => setState(() => _showEnglish = v)),
-                            FilterChip(label: const Text('Urdu'), selected: _showUrdu, onSelected: (v) => setState(() => _showUrdu = v)),
-                            FilterChip(label: const Text('Transliteration'), selected: _showTransliteration, onSelected: (v) => setState(() => _showTransliteration = v)),
-                          ],
-                        ),
+                        Wrap(spacing: 8, runSpacing: 8, children: [FilterChip(label: const Text('English'), selected: _showEnglish, onSelected: (v) => setState(() => _showEnglish = v)), FilterChip(label: const Text('Urdu'), selected: _showUrdu, onSelected: (v) => setState(() => _showUrdu = v)), FilterChip(label: const Text('Transliteration'), selected: _showTransliteration, onSelected: (v) => setState(() => _showTransliteration = v))]),
                         const SizedBox(height: 12),
                         ValueListenableBuilder<AyahData?>(
                           valueListenable: _audio.currentAyah,
@@ -213,21 +160,14 @@ class _QuranReaderPageState extends State<QuranReaderPage> {
                                   onTap: () async => _audio.playSingle(ayah),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                                      children: [
-                                        Row(children: [
-                                          CircleAvatar(radius: 16, child: Text('${ayah.ayah}')),
-                                          const Spacer(),
-                                          IconButton(onPressed: () async => _audio.playSingle(ayah), icon: Icon(active && _audio.isPlaying ? Icons.equalizer_rounded : Icons.play_circle_outline_rounded), tooltip: 'Play ayah'),
-                                        ]),
-                                        const SizedBox(height: 8),
-                                        Text(ayah.arabic, textAlign: TextAlign.right, textDirection: TextDirection.rtl, style: const TextStyle(fontSize: 25, height: 1.9)),
-                                        if (_showTransliteration) ...[const Divider(height: 26), Text(ayah.transliteration, style: const TextStyle(fontStyle: FontStyle.italic))],
-                                        if (_showEnglish) ...[const SizedBox(height: 10), Text(ayah.english)],
-                                        if (_showUrdu) ...[const SizedBox(height: 12), Text(ayah.urdu, textDirection: TextDirection.rtl, textAlign: TextAlign.right)],
-                                      ],
-                                    ),
+                                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                                      Row(children: [CircleAvatar(radius: 16, child: Text('${ayah.ayah}')), const Spacer(), IconButton(onPressed: () async => _audio.playSingle(ayah), icon: Icon(active && _audio.isPlaying ? Icons.equalizer_rounded : Icons.play_circle_outline_rounded), tooltip: 'Play ayah')]),
+                                      const SizedBox(height: 8),
+                                      Text(ayah.arabic, textAlign: TextAlign.right, textDirection: TextDirection.rtl, style: const TextStyle(fontSize: 25, height: 1.9)),
+                                      if (_showTransliteration) ...[const Divider(height: 26), Text(ayah.transliteration, style: const TextStyle(fontStyle: FontStyle.italic))],
+                                      if (_showEnglish) ...[const SizedBox(height: 10), Text(ayah.english)],
+                                      if (_showUrdu) ...[const SizedBox(height: 12), Text(ayah.urdu, textDirection: TextDirection.rtl, textAlign: TextAlign.right)],
+                                    ]),
                                   ),
                                 ),
                               );
